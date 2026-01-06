@@ -10,11 +10,11 @@ def show(img):
     plt.colorbar()
     plt.show()
 
-sample_prev = cv2.imread("Rev22SampleImages/2022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", -1)
-sample_current = cv2.imread("Rev22SampleImages/2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png", -1)
+sample_prev = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", -1)
+sample_current = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png", -1)
 names = ["022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", "2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png"]
-clear = cv2.imread("Rev22SampleImages/2022-04-07T200435_fltrA_1ag_3499986ss_Plume.png", -1)
-dark = cv2.imread("Rev22SampleImages/2022-03-31T041219_fltrA_1ag_1499994ss_Dark.png", -1)
+clear = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-07T200435_fltrA_1ag_3499986ss_Plume.png", -1)
+dark = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-03-31T041219_fltrA_1ag_1499994ss_Dark.png", -1)
 #show(clear)
 #show(dark)
 sample_prev = sample_prev - dark
@@ -28,7 +28,7 @@ sample_sequence = [sample_prev, sample_current]
 
 def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow):
     flow = cv2.calcOpticalFlowFarneback(prev=i1, next=i2, flow =None, pyr_scale=0.5, levels=4, winsize=20, iterations=5, poly_n=7, poly_sigma=1.5, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
-    print(flow.shape)
+    print(type(flow))
     return flow
 
 def calculate_optical_flow_pair_LK(i1, i2, n, initial_flow):
@@ -74,7 +74,7 @@ def add_gauss_noise(sequence):
     noisy_sequence = []
     for image in sequence:
         scale = np.max(image)/2
-        noise = np.random.normal(loc=0, scale =1, size=image.shape)
+        noise = np.random.normal(loc=0, scale =2, size=image.shape)
         noisy_sequence.append(image + noise)
     return noisy_sequence
 
@@ -125,6 +125,7 @@ def calculate_optical_flow_sequence(sequence, names):
     #For each image in the sequence
     #Calculate the flow from that image to the next
     prev_flow = None
+    flow_sequence = []
     for sequence_index in range(0, len(sequence) - 1):
         current_img = sequence[sequence_index]
         #plt.imshow(current_img)
@@ -133,25 +134,24 @@ def calculate_optical_flow_sequence(sequence, names):
         next_img = sequence[sequence_index + 1]
 
         #Farneback #################
-        #flow = calculate_optical_flow_pair_Farneback(current_img, next_img, prev_flow)
+        flow = calculate_optical_flow_pair_Farneback(current_img, next_img, prev_flow)
         #plot_optical_flow_Farneback(image=current_img,flow_components=flow, n=20, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
+        plot_optical_flow_Farneback(image=current_img, flow_components=flow, n=10, save_loc=folder_to_save)
         #prev_flow = flow
 
         #LK ########################
-        original_points, updated_points = calculate_optical_flow_pair_LK(i1 = current_img, i2=next_img, n=20, initial_flow=None, )
-        plot_optical_flow_LK(original_points=original_points, updated_points=updated_points, image=current_img, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
+        #original_points, updated_points = calculate_optical_flow_pair_LK(i1 = current_img, i2=next_img, n=20, initial_flow=None, )
+        #plot_optical_flow_LK(original_points=original_points, updated_points=updated_points, image=current_img, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
 
+        flow_sequence.append(flow)
+    return flow_sequence
 
-sample_sequence = convert_sequence_to_UINT8(sample_sequence)
-#sample_sequence = add_gauss_noise(sample_sequence)
-folder_to_save = "None"
-calculate_optical_flow_sequence(sample_sequence, names)
-
-def calculate_optical_flow_on_train_samples(samples_sheet, data_path, data_path_temporal, mod):
+def calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_temporal, mod):
+    optical_flow_sequences = []
     timesteps = ["prev_tensec_name", "image_name"]
     #For each image in the specified training set
     dataset = pd.read_excel(samples_sheet)
-    dataset = dataset[dataset["overall_quality"] == "Good"]
+    #dataset = dataset[dataset["overall_obs"] == "No"]
     #dataset = dataset[dataset["volcano_name"]=="Merapi"]
     dataset.reset_index(inplace=True)
     for index in range(0, dataset.shape[0], mod):
@@ -177,14 +177,26 @@ def calculate_optical_flow_on_train_samples(samples_sheet, data_path, data_path_
         print(sequence[0].dtype)
         sequence = add_gauss_noise(sequence)
         #Calculate optical flow
-        calculate_optical_flow_sequence(sequence, names)
+        flow_sequence = calculate_optical_flow_sequence(sequence, names)
+        optical_flow_sequences.append(flow_sequence)
         #Save the results
+    return optical_flow_sequences
 
-#samples_sheet = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/PlumeSegmentation/TrainValidTestSplits/CrossValidation/WithoutCotopaxi/Train.xlsx"
-#samples_sheet = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/PlumeSegmentation/TrainValidTestSplits/FinalSplit/Train.xlsx"
-#data_path = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
-#data_path_temporal = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
+#A easy sample pair #############################
+sample_sequence = convert_sequence_to_UINT8(sample_sequence)
+sample_sequence = add_gauss_noise(sample_sequence)
+folder_to_save = "None"
+flow_values = calculate_optical_flow_sequence(sample_sequence, names)
+np.save("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy", flow_values)
+###########################################
+
+
+samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/FinalSplit/Train.xlsx"
+data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
+data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 #folder_to_save = "Optical Flow Outputs/Expmt7 - FBStdPlusNoise - OnWoCotTrainSet"
-#folder_to_save = "none"
-#mod = 1
-#calculate_optical_flow_on_train_samples(samples_sheet, data_path, data_path_temporal, mod)
+folder_to_save = None
+mod = 1
+
+corr_flow_sequences = calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_temporal, mod)
+np.save("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/TrainSetCorrFlowValsFB.npy", corr_flow_sequences)
