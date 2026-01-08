@@ -22,9 +22,11 @@ def plot_optical_flow_Farneback(image, flow_components, n, save_loc=None):
 
     #Downsample every nth flow vector for plotting
     flow_dx = flow_components[0::n,0::n,0]
+    #flow_dx = flow_components[:,:,0]
+    #flow_dy = flow_components[:,:,1]
     flow_dy = flow_components[0::n,0::n,1]
 
-    plt.quiver(X, Y, flow_dx, flow_dy, color='g')
+    plt.quiver(X, Y, flow_dx, flow_dy, color='g', scale_units = 'xy', scale=1, angles='xy')
     plt.gca().invert_yaxis()
     plt.imshow(image, cmap="gray")
     plt.colorbar()
@@ -39,6 +41,7 @@ def warp(original, target, flow_field):
     #For each pixel in the original frame
         #Map to its new location
     #Use bil
+    pass
 
 def interpolation_error(interpolated, target):
     pass
@@ -52,8 +55,9 @@ def calc_interp_error_for_sequence(sequence, names, flow_sequence):
         next_img = sequence[sequence_index + 1]
 
         flow_vals = flow_sequence[sequence_index]
+        #flow_vals = np.ones((486, 648, 2)) * 5
 
-        plot_optical_flow_Farneback(current_img, flow_vals, n=4)
+        plot_optical_flow_Farneback(current_img, flow_vals, n=10)
 
 
 

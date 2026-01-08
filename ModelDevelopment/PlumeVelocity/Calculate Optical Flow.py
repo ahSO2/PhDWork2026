@@ -89,7 +89,7 @@ def plot_optical_flow_Farneback(image, flow_components, n, save_loc=None):
     flow_dx = flow_components[0::n,0::n,0]
     flow_dy = flow_components[0::n,0::n,1]
 
-    plt.quiver(X, Y, flow_dx, flow_dy, color='g')
+    plt.quiver(X, Y, flow_dx, flow_dy, color='g', scale_units='xy', scale=1, angles='xy')
     plt.gca().invert_yaxis()
     plt.imshow(image, cmap="gray")
     plt.colorbar()
