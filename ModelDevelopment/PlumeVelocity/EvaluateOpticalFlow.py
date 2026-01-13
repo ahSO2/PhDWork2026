@@ -36,7 +36,7 @@ def plot_optical_flow_Farneback(image, flow_components, n, save_loc=None):
     plt.close()
 
 def find_dest(x, y, flow_x, flow_y):
-    return (x + flow_x, y+ flow_y)
+    return (y+ flow_y, x + flow_x)
 
 fd_vect = np.vectorize(find_dest)
 
@@ -52,20 +52,22 @@ def billinear_interpolate(values_array, coord):
     x = int_coord[1]
     y = int_coord[0]
 
-    x1 = int_coord[1]
-    x2 = int_coord[1] + 1
-    y1 = int_coord[0]
-    y2 = int_coord[0] + 1
+    x1 = int_coord[1] - 1
+    x2 = int_coord[1]
+    y1 = int_coord[0] - 1
+    y2 = int_coord[0]
 
-    Q11 = padded_arr[x1, y1]
-    Q12 = padded_arr[x1, y2]
-    Q21 = padded_arr[x2, y1]
-    Q22 = padded_arr[x2, y2]
+    C11 = padded_arr[y1, x1]
+    C21 = padded_arr[y2, x1]
+    C12 = padded_arr[y1, x2]
+    C22 = padded_arr[y2, x2]
 
-    R1 = Q11*(x2 - x)/(x2 - x1) + Q21*(x - x1)/(x2 - x1)
-    R2 = Q12*(x2 - x)/(x2 - x1) + Q22*(x - x1)/(x2 - x1)
+    #Interpolate in x-driection for y=y1
+    R1 = C12*(x2 + 1 - x)/(x2 + 1 - x1) + C11*(x - x1)/(x2 + 1 - x1)
+    #Interpolate in x-direction for y=y2
+    R2 = C22*(x2 + 1 - x)/(x2 + 1 - x1) + C21*(x - x1)/(x2 + 1 - x1)
 
-    V = R1*(y2 - y)/(y2 - y1) + R2*(y - y1)/(y2 - y1)
+    V = R2*(y2 + 1 - y)/(y2 + 1 - y1) + R1*(y - y1)/(y2 + 1 - y1)
 
     return V
 
@@ -86,7 +88,7 @@ def warp(original, next, flow_field):
     y_pixels = np.arange(0, warped.shape[0])
     X, Y = np.meshgrid(x_pixels, y_pixels)
 
-
+    #Returns destinations in (y, x) coordinates
     destinations = fd_vect(X, Y, flow_field[:,:,0], flow_field[:,:,1])
 
     #Quick check that the calculated destinations correspond to the correct flow
@@ -110,14 +112,15 @@ def warp(original, next, flow_field):
             dest = (destinations[0][y,x], destinations[1][y,x])
 
             if int(round(dest[0], 0)) < original.shape[0] and int(round(dest[1], 0)) < original.shape[1]:
-                value = next[int(round(dest[1], 0)), int(round(dest[0], 0))]
+                #value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
 
-                #value = billinear_interpolate(next, (int(round(dest[0], 0)), int(round(dest[1], 0))))
+                value = billinear_interpolate(next, (int(round(dest[0], 0)), int(round(dest[1], 0))))
                 warped[y, x] = value
 
 
     plt.imshow(warped, cmap='gray')
     plt.show()
+    return warped
 
 
 
@@ -125,7 +128,11 @@ def warp(original, next, flow_field):
 
 
 def interpolation_error(interpolated, target):
-    pass
+    diff = np.square(interpolated - target)
+    sum = np.sum(diff) * (1/(diff.shape[0] * diff.shape[1]))
+    return np.sqrt(sum)
+
+
 
 def calc_interp_error_for_sequence(sequence, names, flow_sequence):
     for sequence_index in range(0, len(sequence) - 1):
@@ -140,6 +147,9 @@ def calc_interp_error_for_sequence(sequence, names, flow_sequence):
 
         #plot_optical_flow_Farneback(current_img, flow_vals, n=10)
         warped_image = warp(current_img, next_img, flow_vals)
+
+        IE = interpolation_error(warped_image, current_img)
+        print("IE:" + str(IE))
 
 
 
@@ -162,8 +172,5 @@ sample_current = np.divide(sample_current, vin_mask)
 sample_sequence = [sample_prev, sample_current]
 sample_sequence_flow_vals = np.load("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy")
 print(sample_sequence_flow_vals.shape)
+
 calc_interp_error_for_sequence(sample_sequence, names, sample_sequence_flow_vals)
-
-
-#TODO Warping is giving result with the wrong orientation
-#TODO do a double check over the billinear interpolation calc
