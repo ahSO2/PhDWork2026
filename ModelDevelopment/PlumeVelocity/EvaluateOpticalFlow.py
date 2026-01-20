@@ -63,11 +63,11 @@ def billinear_interpolate(values_array, coord):
     C22 = padded_arr[y2, x2]
 
     #Interpolate in x-driection for y=y1
-    R1 = C12*(x2 + 1 - x)/(x2 + 1 - x1) + C11*(x - x1)/(x2 + 1 - x1)
+    R1 = C11*(x2 + 1 - x)/(x2 + 1 - x1) + C12*(x - x1)/(x2 + 1 - x1)
     #Interpolate in x-direction for y=y2
-    R2 = C22*(x2 + 1 - x)/(x2 + 1 - x1) + C21*(x - x1)/(x2 + 1 - x1)
+    R2 = C21*(x2 + 1 - x)/(x2 + 1 - x1) + C22*(x - x1)/(x2 + 1 - x1)
 
-    V = R2*(y2 + 1 - y)/(y2 + 1 - y1) + R1*(y - y1)/(y2 + 1 - y1)
+    V = R1*(y2 + 1 - y)/(y2 + 1 - y1) + R2*(y - y1)/(y2 + 1 - y1)
 
     return V
 
