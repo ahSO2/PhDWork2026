@@ -5,6 +5,7 @@
 
 
 import cv2
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -45,9 +46,10 @@ def billinear_interpolate(values_array, coord):
     #Pad the array with copies of the edge rows
     padded_arr = np.pad(values_array, pad_width=1, mode="edge")
 
+    padded_coord = (coord[0] + 1, coord[1] + 1)
     #Round the coordinate to nearest integer
     #Coord is given in form (y, x)
-    int_coord = (int(np.round(coord[0], 0)), int(np.round(coord[1], 0)))
+    int_coord = (int(np.round(padded_coord[0], 0)), int(np.round(padded_coord[1], 0)))
 
     x = int_coord[1]
     y = int_coord[0]
@@ -63,13 +65,67 @@ def billinear_interpolate(values_array, coord):
     C22 = padded_arr[y2, x2]
 
     #Interpolate in x-driection for y=y1
-    R1 = C11*(x2 + 1 - x)/(x2 + 1 - x1) + C12*(x - x1)/(x2 + 1 - x1)
+    R1 = C11*(x2 + 1 - padded_coord[1])/(x2 + 1 - x1) + C12*(padded_coord[1] - x1)/(x2 + 1 - x1)
     #Interpolate in x-direction for y=y2
-    R2 = C21*(x2 + 1 - x)/(x2 + 1 - x1) + C22*(x - x1)/(x2 + 1 - x1)
+    R2 = C21*(x2 + 1 - padded_coord[1])/(x2 + 1 - x1) + C22*(padded_coord[1] - x1)/(x2 + 1 - x1)
 
-    V = R1*(y2 + 1 - y)/(y2 + 1 - y1) + R2*(y - y1)/(y2 + 1 - y1)
+    V = R1*(y2 + 1 - padded_coord[0])/(y2 + 1 - y1) + R2*(padded_coord[0] - y1)/(y2 + 1 - y1)
 
     return V
+
+def grid_interpolation(values_array, coord):
+    # Pad the array with copies of the edge rows
+    padded_arr = np.pad(values_array, pad_width=1, mode="edge")
+    #print(coord)
+    padded_coord = (coord[0] + 1, coord[1] + 1)
+
+    # Round the coordinate to nearest integer
+    # Coord is given in form (y, x)
+    int_coord = (int(np.round(padded_coord[0], 0)), int(np.round(padded_coord[1], 0)))
+
+    relevant_vals = padded_arr[int_coord[0] - 1: int_coord[0] + 2, int_coord[1] - 1: int_coord[1] + 2]
+
+    x1 = int_coord[1] - 1
+    x2 = int_coord[1]
+    x3 = int_coord[1] + 1
+    y1 = int_coord[0] - 1
+    y2 = int_coord[0]
+    y3 = int_coord[0] + 1
+
+    C11 = (y1, x1)
+    C21 = (y2, x1)
+    C31 = (y3, x1)
+    C12 = (y1, x2)
+    C22 = (y2, x2)
+    C32 = (y3, x2)
+    C13 = (y1, x3)
+    C23 = (y2, x3)
+    C33 = (y3, x3)
+
+    d11 = math.dist(C11, padded_coord)
+    d12 = math.dist(C12, padded_coord)
+    d13 = math.dist(C13, padded_coord)
+    d21 = math.dist(C21, padded_coord)
+    d22 = math.dist(C22, padded_coord)
+    d23 = math.dist(C23, padded_coord)
+    d31 = math.dist(C31, padded_coord)
+    d32 = math.dist(C32, padded_coord)
+    d33 = math.dist(C33, padded_coord)
+
+    dists_mat = np.array([[d11, d12, d13],
+                          [d21, d22, d23],
+                          [d31, d32, d33]])
+    #print(dists_mat)
+    #Matrix of scale factor multipliers for the pixel values
+    #Each pixel contributes based on the relative size of its center
+    #distance from the point
+    scale_mat = dists_mat / np.sum(dists_mat)
+    scale_mat = np.ones_like(scale_mat) - scale_mat
+    scale_mat = scale_mat / np.sum(scale_mat)
+
+    contributions = np.multiply(relevant_vals, scale_mat)
+
+    return np.sum(contributions)
 
 def warp(original, next, flow_field):
     '''Warp the second "next" image back to the original,
@@ -111,11 +167,14 @@ def warp(original, next, flow_field):
 
             dest = (destinations[0][y,x], destinations[1][y,x])
 
+            #If the destination index is not too large
             if int(round(dest[0], 0)) < original.shape[0] and int(round(dest[1], 0)) < original.shape[1]:
-                #value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
-
-                value = billinear_interpolate(next, (int(round(dest[0], 0)), int(round(dest[1], 0))))
-                warped[y, x] = value
+                #If the destination index is not negative:
+                if int(round(dest[0], 0)) >= 0 and int(round(dest[1], 0)) >= 0:
+                    value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
+                    #value = grid_interpolation(next, (dest[0], dest[1]))
+                    #value = billinear_interpolate(next, (dest[0], dest[1]))
+                    warped[y, x] = value
 
 
     plt.imshow(warped, cmap='gray')
