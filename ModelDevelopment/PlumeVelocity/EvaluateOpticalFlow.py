@@ -171,8 +171,8 @@ def warp(original, next, flow_field):
             if int(round(dest[0], 0)) < original.shape[0] and int(round(dest[1], 0)) < original.shape[1]:
                 #If the destination index is not negative:
                 if int(round(dest[0], 0)) >= 0 and int(round(dest[1], 0)) >= 0:
-                    value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
-                    #value = grid_interpolation(next, (dest[0], dest[1]))
+                    #value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
+                    value = grid_interpolation(next, (dest[0], dest[1]))
                     #value = billinear_interpolate(next, (dest[0], dest[1]))
                     warped[y, x] = value
 
@@ -204,13 +204,18 @@ def calc_interp_error_for_sequence(sequence, names, flow_sequence):
         flow_vals = flow_sequence[sequence_index]
         #flow_vals = np.ones((486, 648, 2)) * 5
 
-        #plot_optical_flow_Farneback(current_img, flow_vals, n=10)
+        plot_optical_flow_Farneback(current_img, flow_vals, n=10)
         warped_image = warp(current_img, next_img, flow_vals)
 
         IE = interpolation_error(warped_image, current_img)
         print("IE:" + str(IE))
 
-
+def convert_sequence_to_UINT8(sequence):
+    converted_sequence = []
+    for image in sequence:
+        converted_image = (image/4).astype("uint8")
+        converted_sequence.append(converted_image)
+    return converted_sequence
 
 
 
@@ -229,6 +234,7 @@ sample_current = np.divide(sample_current, vin_mask)
 #show(sample_prev)
 #show(sample_current)
 sample_sequence = [sample_prev, sample_current]
+sample_sequence = convert_sequence_to_UINT8(sample_sequence)
 sample_sequence_flow_vals = np.load("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy")
 print(sample_sequence_flow_vals.shape)
 
