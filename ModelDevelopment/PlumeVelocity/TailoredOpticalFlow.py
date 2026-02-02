@@ -180,7 +180,7 @@ def apply_function_on_train_samples(samples_sheet, data_path, data_path_temporal
 
         #Save the results
 
-samples_sheet = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/PlumeSegmentation/TrainValidTestSplits/CrossValidation/WithoutCotopaxi/Train.xlsx"
+#TODO This is the old CV split that I was initialy using: seen notes in Seg Plans and Progress Log 1 - samples_sheet = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/PlumeSegmentation/TrainValidTestSplits/CrossValidation/WithoutCotopaxi/Train.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 #folder_to_save = "Optical Flow Outputs/Expmt7 - FBStdPlusNoise - OnWoCotTrainSet"
