@@ -95,10 +95,10 @@ def plot_optical_flow_Farneback(image, flow_components, n, save_loc=None):
     plt.colorbar()
     if save_loc != None:
         plt.savefig(save_loc)
-    #plt.show()
+    plt.show()
     plt.close()
 
-def plot_optical_flow_LK(original_points, updated_points, image, save_loc=None):
+def plot_optical_flow_LK(original_points, updated_points, image, save_loc):
     # To plot flow field, need to make arrays of x-coords, y-coords, x_flow and y_flow
     # Need to take negative of y_displacent because of indexing #This gives much more reasonable results!!
 
@@ -112,16 +112,16 @@ def plot_optical_flow_LK(original_points, updated_points, image, save_loc=None):
 
     #y_displ_to_plot = -y_displ
     #start_y_coords_to_plot = 486 - start_y_coords
-
-    plt.quiver(start_x_coords, start_y_coords, x_displ, y_displ)
-    plt.title("LK Method")
-    plt.imshow(image, cmap="gray")
-    plt.colorbar()
-    #if save_loc != None:
-    #    plt.savefig(save_loc)
-    plt.show()
-    #plt.close()
-def calculate_optical_flow_sequence(sequence, names):
+    fig,axs = plt.subplots(figsize=(10,10))
+    vectors = axs.quiver(start_x_coords, start_y_coords, x_displ, y_displ, color='darkorange', scale_units='xy', scale=1, angles='xy')
+    axs.set_title("LK Method")
+    axs.imshow(image, cmap="gray")
+    #fig.colorbar(vectors, ax=axs)
+    if save_loc != None:
+        plt.savefig(save_loc, dpi=fig.dpi)
+    #plt.show()
+    plt.close()
+def calculate_optical_flow_sequence(sequence, names, folder_to_save):
     #For each image in the sequence
     #Calculate the flow from that image to the next
     prev_flow = None
@@ -134,19 +134,19 @@ def calculate_optical_flow_sequence(sequence, names):
         next_img = sequence[sequence_index + 1]
 
         #Farneback #################
-        flow = calculate_optical_flow_pair_Farneback(current_img, next_img, prev_flow)
+        #flow = calculate_optical_flow_pair_Farneback(current_img, next_img, prev_flow)
         #plot_optical_flow_Farneback(image=current_img,flow_components=flow, n=20, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
-        plot_optical_flow_Farneback(image=current_img, flow_components=flow, n=10, save_loc=folder_to_save)
+        #plot_optical_flow_Farneback(image=current_img, flow_components=flow, n=10, save_loc=folder_to_save)
         #prev_flow = flow
 
         #LK ########################
-        #original_points, updated_points = calculate_optical_flow_pair_LK(i1 = current_img, i2=next_img, n=20, initial_flow=None, )
-        #plot_optical_flow_LK(original_points=original_points, updated_points=updated_points, image=current_img, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
+        original_points, updated_points = calculate_optical_flow_pair_LK(i1 = current_img, i2=next_img, n=20, initial_flow=None)
+        plot_optical_flow_LK(original_points=original_points, updated_points=updated_points, image=current_img, save_loc=folder_to_save + names[sequence_index])
 
-        flow_sequence.append(flow)
+        #flow_sequence.append(flow)
     return flow_sequence
 
-def calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_temporal, mod):
+def calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_temporal, mod, folder_to_save):
     optical_flow_sequences = []
     timesteps = ["prev_tensec_name", "image_name"]
     #For each image in the specified training set
@@ -175,28 +175,28 @@ def calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_tempor
         sequence = convert_sequence_to_UINT8(sequence)
         print("Data type after converting sequence:")
         print(sequence[0].dtype)
-        sequence = add_gauss_noise(sequence)
+        #sequence = add_gauss_noise(sequence)
         #Calculate optical flow
-        flow_sequence = calculate_optical_flow_sequence(sequence, names)
+        flow_sequence = calculate_optical_flow_sequence(sequence, names, folder_to_save=folder_to_save)
         optical_flow_sequences.append(flow_sequence)
         #Save the results
     return optical_flow_sequences
 
 #A easy sample pair #############################
-sample_sequence = convert_sequence_to_UINT8(sample_sequence)
-sample_sequence = add_gauss_noise(sample_sequence)
-folder_to_save = "None"
-flow_values = calculate_optical_flow_sequence(sample_sequence, names)
-np.save("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy", flow_values)
+#sample_sequence = convert_sequence_to_UINT8(sample_sequence)
+#sample_sequence = add_gauss_noise(sample_sequence)
+#folder_to_save = "None"
+#flow_values = calculate_optical_flow_sequence(sample_sequence, names, folder_to_save)
+#np.save("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy", flow_values)
 ###########################################
 
 
 samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/FinalSplit/Train.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
-#folder_to_save = "Optical Flow Outputs/Expmt7 - FBStdPlusNoise - OnWoCotTrainSet"
-folder_to_save = None
+folder_to_save = "C:/Users/ggp24ash/Documents/Scratch Data/OpticalFlowVis/"
+#folder_to_save = None
 mod = 1
 
-corr_flow_sequences = calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_temporal, mod)
-np.save("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/TrainSetCorrFlowValsFB.npy", corr_flow_sequences)
+corr_flow_sequences = calculate_optical_flow_on_samples(samples_sheet, data_path, data_path_temporal, mod, folder_to_save)
+#np.save("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/TrainSetCorrFlowValsFB.npy", corr_flow_sequences)
