@@ -110,16 +110,16 @@ def pixel_diff(sample_current, sample_next):
     denoised = cv2.medianBlur((image - image_min).astype("uint8"),ksize=9)
     denoised = denoised.astype("float32") + image_min
     print(denoised.dtype)
-    show(denoised)
+    #show(denoised)
     hist_data = cv2.calcHist([diff], [0], None, [511], [-255, 255])
     grey_vals = np.linspace(-255,255, 511)
     #print(hist_data.shape)
     #print(grey_vals.shape)
-    plt.scatter(grey_vals, hist_data)
-    plt.show()
+    #plt.scatter(grey_vals, hist_data)
+    #plt.show()
     results_img = np.abs(denoised)
     results_img = np.where(results_img >= 2, 1, 0)
-    show(results_img)
+    #show(results_img)
     #results_img = np.where(results_img>(np.percentile(results_img[450:480,:], 95)), 1, 0)
     #show(results_img)
 
@@ -176,7 +176,7 @@ def apply_function_on_train_samples(samples_sheet, data_path, data_path_temporal
             next_img = sequence[sequence_index + 1]
             #show(next_img)
             pixel_diff(current_img, next_img)
-            #MOG(current_img, next_img)
+            MOG(current_img, next_img)
 
         #Save the results
 
