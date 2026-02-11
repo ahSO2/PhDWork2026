@@ -158,7 +158,7 @@ def warp(original, next, flow_field):
 
     #For each pixel in the warped frame
     for x in range(0, warped.shape[1]):
-        print("Warping col: " + str(x))
+        #print("Warping col: " + str(x))
         for y in range(0, warped.shape[0]):
             #For each pixel in the original, find where in
             #the "next" image it is mapped to by the flow
@@ -171,8 +171,8 @@ def warp(original, next, flow_field):
             if int(round(dest[0], 0)) < original.shape[0] and int(round(dest[1], 0)) < original.shape[1]:
                 #If the destination index is not negative:
                 if int(round(dest[0], 0)) >= 0 and int(round(dest[1], 0)) >= 0:
-                    #value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
-                    value = grid_interpolation(next, (dest[0], dest[1]))
+                    value = next[int(round(dest[0], 0)), int(round(dest[1], 0))]
+                    #value = grid_interpolation(next, (dest[0], dest[1]))
                     #value = billinear_interpolate(next, (dest[0], dest[1]))
                     warped[y, x] = value
 
@@ -219,23 +219,61 @@ def convert_sequence_to_UINT8(sequence):
 
 
 
-sample_prev = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", -1)
-sample_current = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png", -1)
-names = ["022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", "2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png"]
-clear = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-07T200435_fltrA_1ag_3499986ss_Plume.png", -1)
-dark = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-03-31T041219_fltrA_1ag_1499994ss_Dark.png", -1)
+#sample_prev = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", -1)
+#sample_current = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png", -1)
+#names = ["022-04-24T172015_fltrA_1ag_1499994ss_Plume.png", "2022-04-24T172025_fltrA_1ag_1499994ss_Plume.png"]
+#clear = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-04-07T200435_fltrA_1ag_3499986ss_Plume.png", -1)
+#dark = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/Rev22SampleImages/2022-03-31T041219_fltrA_1ag_1499994ss_Dark.png", -1)
 #show(clear)
 #show(dark)
-sample_prev = sample_prev - dark
-sample_current = sample_current - dark
-vin_mask = clear/np.max(clear)
-sample_prev = np.divide(sample_prev, vin_mask)
-sample_current = np.divide(sample_current, vin_mask)
+#sample_prev = sample_prev - dark
+#sample_current = sample_current - dark
+#vin_mask = clear/np.max(clear)
+#sample_prev = np.divide(sample_prev, vin_mask)
+#sample_current = np.divide(sample_current, vin_mask)
 #show(sample_prev)
 #show(sample_current)
-sample_sequence = [sample_prev, sample_current]
-sample_sequence = convert_sequence_to_UINT8(sample_sequence)
-sample_sequence_flow_vals = np.load("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy")
-print(sample_sequence_flow_vals.shape)
+#sample_sequence = [sample_prev, sample_current]
+#sample_sequence = convert_sequence_to_UINT8(sample_sequence)
+#sample_sequence_flow_vals = np.load("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/RevGoodQualCorrFlowValsFB.npy")
+#print(sample_sequence_flow_vals.shape)
 
-calc_interp_error_for_sequence(sample_sequence, names, sample_sequence_flow_vals)
+#calc_interp_error_for_sequence(sample_sequence, names, sample_sequence_flow_vals)
+
+samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/FinalSplit/Train.xlsx"
+data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
+data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
+folder_to_save = "C:/Users/ggp24ash/Documents/Scratch Data/OpticalFlowVis/"
+sample_sequence_flow_vals = np.load("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/Expmt10 - Std FB Interpolation Error/TrainSetCorrFlowValsFB.npy")
+mod = 1
+
+
+timesteps = ["prev_tensec_name", "image_name"]
+#For each image in the specified training set
+dataset = pd.read_excel(samples_sheet)
+#dataset = dataset[dataset["overall_obs"] == "No"]
+#dataset = dataset[dataset["volcano_name"]=="Merapi"]
+dataset.reset_index(inplace=True)
+for index in range(0, dataset.shape[0], mod):
+    flow_vals = sample_sequence_flow_vals[index]
+    #Read the sequence
+    sequence = []
+    names = []
+    for timestep_name in timesteps:
+        if timestep_name == "image_name":
+            folder_to_read = data_path
+            print(dataset[timestep_name][index])
+        elif timestep_name == "image_name_B":
+            folder_to_read = data_path
+        else:
+            folder_to_read = data_path_temporal
+        name_to_read = dataset[timestep_name][index]
+        timestep_image = cv2.imread(folder_to_read + "/" + name_to_read, -1)
+            #plt.imshow(timestep_image)
+            #plt.show()
+        sequence.append(timestep_image)
+        names.append(name_to_read)
+
+    sequence = convert_sequence_to_UINT8(sequence)
+    calc_interp_error_for_sequence(sequence, names, flow_vals)
+

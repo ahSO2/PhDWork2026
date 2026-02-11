@@ -134,14 +134,14 @@ def calculate_optical_flow_sequence(sequence, names, folder_to_save):
         next_img = sequence[sequence_index + 1]
 
         #Farneback #################
-        #flow = calculate_optical_flow_pair_Farneback(current_img, next_img, prev_flow)
-        #plot_optical_flow_Farneback(image=current_img,flow_components=flow, n=20, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
+        flow = calculate_optical_flow_pair_Farneback(current_img, next_img, prev_flow)
+        plot_optical_flow_Farneback(image=current_img,flow_components=flow, n=20, save_loc=folder_to_save + "/" + names[sequence_index] + ".png")
         #plot_optical_flow_Farneback(image=current_img, flow_components=flow, n=10, save_loc=folder_to_save)
         #prev_flow = flow
 
         #LK ########################
-        original_points, updated_points = calculate_optical_flow_pair_LK(i1 = current_img, i2=next_img, n=20, initial_flow=None)
-        plot_optical_flow_LK(original_points=original_points, updated_points=updated_points, image=current_img, save_loc=folder_to_save + names[sequence_index])
+        #original_points, updated_points = calculate_optical_flow_pair_LK(i1 = current_img, i2=next_img, n=20, initial_flow=None)
+        #plot_optical_flow_LK(original_points=original_points, updated_points=updated_points, image=current_img, save_loc=folder_to_save + names[sequence_index])
 
         #flow_sequence.append(flow)
     return flow_sequence
