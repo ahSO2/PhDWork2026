@@ -122,7 +122,9 @@ Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               'sensor_marks_mask_A': "Reventador_2024A.png",
                               'sensor_marks_mask_B': "None",
                               "shared_drive_folder_path": "X:/volcano_cameras/Shared/Reventador/",
-                              "shared_drive_has_year_subfolders": "yes"}
+                              "shared_drive_has_year_subfolders": "yes",
+                              "integration_region_center": (348, 284),
+                              "integration_radius": 100}
 
 Lascar_dictionary = {'volcano_dictionary_name':"Lascar",
                      'volcano_name':"Lascar",
