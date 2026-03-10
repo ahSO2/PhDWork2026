@@ -13,14 +13,16 @@ Cotopaxi_View2_dictionary = {'volcano_dictionary_name':"CotopaxiView2",
                              'sensor_marks_mask_A':"None",
                              'sensor_marks_mask_B':"None",
                              "shared_drive_folder_path":"X:/volcano_cameras/Shared/Cotopaxi/",
-                             "shared_drive_has_year_subfolders":"yes"}
+                             "shared_drive_has_year_subfolders":"yes",
+                             "integration_region_center": (466, 306),
+                             "integration_radius": 100}
 
 Cotopaxi_View3_dictionary = {'volcano_dictionary_name':"CotopaxiView3",
                              'volcano_name':"Cotopaxi",
                              'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                          'calc_area_outline_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/CotopaxiView3CalcAreaOutlineMask.png",
                             'calc_area_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/CotopaxiView3CalcAreaMask.png",
-                             'flank_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/CotopaxiView3FlankMask.png",
+                             'flank_mask_path':"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/CotopaxiView3FlankMask.png",
                          'sig_figs_for_dark_ss': 1,
                          'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Cotopaxi_BandA",
                          'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Cotopaxi_BandB",
@@ -31,14 +33,16 @@ Cotopaxi_View3_dictionary = {'volcano_dictionary_name':"CotopaxiView3",
                              'sensor_marks_mask_A':"None",
                              'sensor_marks_mask_B':"None",
                              "shared_drive_folder_path":"X:/volcano_cameras/Shared/Cotopaxi/",
-                             "shared_drive_has_year_subfolders":"yes"}
+                             "shared_drive_has_year_subfolders":"yes",
+                              "integration_region_center": (335, 208),
+                              "integration_radius":100}
 
 Cotopaxi_View4_dictionary = {'volcano_dictionary_name':"CotopaxiView4",
                              'volcano_name':"Cotopaxi",
                              'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                          'calc_area_outline_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/Cotopaxi27Aug2023CalcAreaOutlineMask.png",
                             'calc_area_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/Cotopaxi27Aug2023CalcAreaMask.png",
-                             'flank_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/Cotopaxi27Aug2023FlankMask.png",
+                             'flank_mask_path':"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/Cotopaxi27Aug2023FlankMask.png",
                          'sig_figs_for_dark_ss': 1,
                          'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Cotopaxi_BandA",
                          'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Cotopaxi_BandB",
@@ -49,14 +53,16 @@ Cotopaxi_View4_dictionary = {'volcano_dictionary_name':"CotopaxiView4",
                              'sensor_marks_mask_A': "None",
                              'sensor_marks_mask_B': "None",
                              "shared_drive_folder_path": "X:/volcano_cameras/Shared/Cotopaxi/",
-                             "shared_drive_has_year_subfolders": "yes"}
+                             "shared_drive_has_year_subfolders": "yes",
+                              "integration_region_center": (265, 292),
+                              "integration_radius":100}
 
 Kilauea_View1_dictionary = {'volcano_dictionary_name':"KilaueaView1",
                             'volcano_name':'Kilauea',
                             'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                          'calc_area_outline_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/KilaueaView1CalcAreaOutlineMask.png",
                             'calc_area_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/KilaueaView1CalcAreaMask.png",
-                            'flank_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/KilaueaView1FlankMask.png",
+                            'flank_mask_path':"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/KilaueaView1FlankMask.png",
                          'sig_figs_for_dark_ss': 1,
                          'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Kilauea_BandA",
                          'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Kilauea_BandB",
@@ -67,7 +73,9 @@ Kilauea_View1_dictionary = {'volcano_dictionary_name':"KilaueaView1",
                             'sensor_marks_mask_A': "Kilauea_1A.png",
                             'sensor_marks_mask_B': "Kilauea_1B.png",
                             "shared_drive_folder_path": "X:/pering_group/Shared/Kilauea/",
-                            "shared_drive_has_year_subfolders": "no"}
+                            "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (644,323),
+                              "integration_radius":300}
 
 
 Kilauea_View2_dictionary = {'volcano_dictionary_name':"KilaueaView2",
@@ -75,7 +83,7 @@ Kilauea_View2_dictionary = {'volcano_dictionary_name':"KilaueaView2",
                             'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                          'calc_area_outline_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/KilaueaView2CalcAreaOutlineMask.png",
                             'calc_area_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/KilaueaView2CalcAreaMask.png",
-                            'flank_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/KilaueaView2FlankMask.png",
+                            'flank_mask_path':"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/KilaueaView2FlankMask.png",
                          'sig_figs_for_dark_ss': 1,
                          'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Kilauea_BandA",
                          'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Kilauea_BandB",
@@ -86,14 +94,16 @@ Kilauea_View2_dictionary = {'volcano_dictionary_name':"KilaueaView2",
                             'sensor_marks_mask_A': "None",
                             'sensor_marks_mask_B': "None",
                             "shared_drive_folder_path": "X:/pering_group/Shared/Kilauea/",
-                            "shared_drive_has_year_subfolders": "no"}
+                            "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (644,323),
+                              "integration_radius":300}
 
 Reventador_2023_dictionary = {'volcano_dictionary_name':"Reventador2023",
                               'volcano_name':'Reventador',
                         'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                          'calc_area_outline_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/Reventador2023CalcAreaOutlineMask.png",
                             'calc_area_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/Reventador2023CalcAreaMask.png",
-                            'flank_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/Reventador2023FlankMask.png",
+                            'flank_mask_path':"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/Reventador2023FlankMask.png",
                          'sig_figs_for_dark_ss': 2,
                          'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Reventador_Band_A",
                          'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Reventador_Band_B",
@@ -104,14 +114,16 @@ Reventador_2023_dictionary = {'volcano_dictionary_name':"Reventador2023",
                               'sensor_marks_mask_A': "Reventador_2024A.png",
                               'sensor_marks_mask_B': "None",
                               "shared_drive_folder_path": "X:/volcano_cameras/Shared/Reventador/",
-                              "shared_drive_has_year_subfolders": "yes"}
+                              "shared_drive_has_year_subfolders": "yes",
+                              "integration_region_center": (335, 275),
+                              "integration_radius":100}
 
 Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               'volcano_name':'Reventador',
                               'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                          'calc_area_outline_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/SpecificApplicationScripts/ImageQualityClassificationAfterCR/RainAndAsh/CalcAreaMasks/ReventadorCalcAreaOutlineMask.png",
                               'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/ReventadorCalcAreaMask.png",
-                              'flank_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/ReventadorFlankMask.png",
+                              'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/ReventadorFlankMask.png",
                          'sig_figs_for_dark_ss': 1,
                          'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Reventador_Band_A",
                          'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Reventador_Band_B",
@@ -130,7 +142,7 @@ Lascar_dictionary = {'volcano_dictionary_name':"Lascar",
                      'volcano_name':"Lascar",
                      'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/SpecificApplicationScripts/ImageQualityClassificationAfterCR/RainAndAsh/CalcAreaMasks/LascarCalcAreaOutlineMask.png",
                      'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/LascarCalcAreaMask.png",
-                     'flank_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/LascarFlankMask.png",
+                     'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/LascarFlankMask.png",
                      'sig_figs_for_dark_ss': 1,
                      'dark_path_A': "C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lascar_BandA",
                      'dark_path_B': "C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lascar_BandB",
@@ -141,14 +153,16 @@ Lascar_dictionary = {'volcano_dictionary_name':"Lascar",
                      'sensor_marks_mask_A': "Lascar_A.png",
                      'sensor_marks_mask_B': "None",
                     "shared_drive_folder_path": "X:/volcano_cameras/Shared/Lascar/",
-                    "shared_drive_has_year_subfolders": "yes"}
+                    "shared_drive_has_year_subfolders": "yes",
+                     "integration_region_center": (280, 309),
+                     "integration_radius": 170}
 
 Lastarria_dictionary = {'volcano_dictionary_name':"Lastarria",
                         'volcano_name':'Lastarria',
                         'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                         'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/SpecificApplicationScripts/ImageQualityClassificationAfterCR/RainAndAsh/CalcAreaMasks/LastarriaCalcAreaOutlineMask.png",
                         'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/LastarriaCalcAreaMask.png",
-                        'flank_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/LastarriaFlankMask.png",
+                        'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/LastarriaFlankMask.png",
                         'sig_figs_for_dark_ss':1,
                         'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lastarria_BandA",
                         'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lastarria_BandB",
@@ -173,10 +187,11 @@ Merapi_View0_dictionary = {'volcano_dictionary_name':"MerapiView0",
                            'sensor_marks_mask_A': "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_3B.png",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (340, 270),
+                              "integration_radius":100}
 
-Merapi_TenthMay_dictionary = {'volcano_dictionary_name':"MerapiTenthMay",
+Merapi_TenthJune_dictionary = {'volcano_dictionary_name':"MerapiTenthJune",
                            'volcano_name':'Merapi',
                         'sig_figs_for_dark_ss':1,
                         'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandA",
@@ -191,7 +206,7 @@ Merapi_TenthMay_dictionary = {'volcano_dictionary_name':"MerapiTenthMay",
                            "shared_drive_has_year_subfolders": "no"
                            }
 
-Merapi_SixteenthMay_dictionary = {'volcano_dictionary_name':"MerapiSixteenthMay",
+Merapi_SixteenthJune_dictionary = {'volcano_dictionary_name':"MerapiSixteenthJune",
                            'volcano_name':'Merapi',
                         'sig_figs_for_dark_ss':1,
                         'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandA",
@@ -203,8 +218,9 @@ Merapi_SixteenthMay_dictionary = {'volcano_dictionary_name':"MerapiSixteenthMay"
                            'sensor_marks_mask_A': "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_3B.png",
                         "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (310, 265),
+                              "integration_radius":100}
 
 Merapi_SecondOct_dictionary = {'volcano_dictionary_name':"MerapiSecondOct",
                            'volcano_name':'Merapi',
@@ -218,8 +234,9 @@ Merapi_SecondOct_dictionary = {'volcano_dictionary_name':"MerapiSecondOct",
                            'sensor_marks_mask_A': "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_3B.png",
                                "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (264, 254),
+                              "integration_radius":100}
 
 Merapi_View1_dictionary = {'volcano_dictionary_name':"MerapiView1",
                            'volcano_name':'Merapi',
@@ -233,15 +250,16 @@ Merapi_View1_dictionary = {'volcano_dictionary_name':"MerapiView1",
                            'sensor_marks_mask_A': "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_3B.png",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (346, 270),
+                              "integration_radius":100}
 
 Merapi_View3_dictionary = {'volcano_dictionary_name':"MerapiView3",
                            'volcano_name':'Merapi',
                         'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                            'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/MerapiView3CalcRegionOutlineMask.png",
                            'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/MerapiView3CalcAreaMask.png",
-                           'flank_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/MerapiView3FlankMask.png",
+                           'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/MerapiView3FlankMask.png",
                         'sig_figs_for_dark_ss':1,
                         'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandA",
                         'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandB",
@@ -252,15 +270,16 @@ Merapi_View3_dictionary = {'volcano_dictionary_name':"MerapiView3",
                            'sensor_marks_mask_A':"Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_3B.png",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                           "integration_region_center": (314, 262),
+                           "integration_radius": 100}
 
 Merapi_View4_dictionary = {'volcano_dictionary_name':"MerapiView4",
                            'volcano_name':'Merapi',
                             'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                            'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/MerapiView4CalcAreaOutlineMask.png",
                            'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/MerapiView4CalcAreaMask.png",
-                           'flank_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/MerapiView4FlankMask.png",
+                           'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/MerapiView4FlankMask.png",
                         'sig_figs_for_dark_ss':1,
                         'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandA",
                         'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandB",
@@ -271,15 +290,16 @@ Merapi_View4_dictionary = {'volcano_dictionary_name':"MerapiView4",
                            'sensor_marks_mask_A':  "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_4B.png",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                              "integration_region_center": (280, 253),
+                              "integration_radius":100}
 
 Merapi_View5_dictionary = {'volcano_dictionary_name':"MerapiView5",
                            'volcano_name':'Merapi',
                             'labelled_data_folder_path':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/FullDataset_CorrectedWVolcDictionary2",
                            'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/MerapiView5CalcAreaOutlineMask.png",
                            'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/MerapiView5CalcAreaMask.png",
-                           'flank_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/FlankMasks/MerapiView5FlankMask.png",
+                           'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/MerapiView5FlankMask.png",
                         'sig_figs_for_dark_ss':1,
                         'dark_path_A':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandA",
                         'dark_path_B':"C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Merapi_BandB",
@@ -290,11 +310,13 @@ Merapi_View5_dictionary = {'volcano_dictionary_name':"MerapiView5",
                             'sensor_marks_mask_A': "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_5B.png",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"}
+                           "shared_drive_has_year_subfolders": "no",
+                           "integration_region_center": (257, 248),
+                           "integration_radius": 100}
 
 all_dictionaries = [Cotopaxi_View2_dictionary, Cotopaxi_View3_dictionary, Cotopaxi_View4_dictionary, Kilauea_View1_dictionary, Kilauea_View2_dictionary,
-                    Reventador_2023_dictionary, Reventador_2024_dictionary, Lascar_dictionary, Lastarria_dictionary, Merapi_View0_dictionary, Merapi_TenthMay_dictionary,
-                    Merapi_SixteenthMay_dictionary, Merapi_SecondOct_dictionary, Merapi_View1_dictionary, Merapi_View3_dictionary,Merapi_View4_dictionary, Merapi_View5_dictionary]
+                    Reventador_2023_dictionary, Reventador_2024_dictionary, Lascar_dictionary, Lastarria_dictionary, Merapi_View0_dictionary, Merapi_TenthJune_dictionary,
+                    Merapi_SixteenthJune_dictionary, Merapi_SecondOct_dictionary, Merapi_View1_dictionary, Merapi_View3_dictionary,Merapi_View4_dictionary, Merapi_View5_dictionary]
 
 all_dictionary_names = []
 for dictionary in all_dictionaries:

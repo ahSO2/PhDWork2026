@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import ndimage
+import sys
+sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
+import VolcDictionaryWithCorrectClears
 
 samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/KilaueaLeftOut_Train.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
@@ -179,6 +182,30 @@ def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
 
     return flow
 
+def find_y_coords(x, center, radius):
+    y_sq = radius**2 - (x-center[0])**2
+    y_rt = np.sqrt(y_sq)
+    y1 = y_rt + center[1]
+    y2 = -y_rt + center[1]
+    return np.array([y1, y2])
+
+find_y_coords_vect = np.vectorize(find_y_coords)
+def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
+
+    #Select the set of points on the circle
+    x_range = np.linspace(max(0,circle_center[0] - circle_radius), min(frame1.shape[0] -1, circle_center[0] + circle_radius))
+    y_coords = find_y_coords_vect(x_range)
+    print(y_coords)
+
+    #Use the flank mask to select points to integrate over
+    flow[:, :, 0] = np.where(flank_mask==0, 0, flow[:, :, 0])
+    flow[:, :, 1] = np.where(flank_mask==0, 0, flow[:, :, 1])
+
+    #Calculate the unit normal for each point
+    #(take vector from center to that point, then scale so magnitude is one)
+    #Then take dot product with the velocity at that point
+    #Lastly, mulptiply by the intensity values, then sum
+
 #For each sample:
 df.reset_index(inplace=True)
 for index in range(0, df.shape[0], mod):
@@ -207,6 +234,14 @@ for index in range(0, df.shape[0], mod):
     flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=20, plot=True)
 
     #Define the integration boundary
+    dictionary_name = names[0].split("_")[0]
+    dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
+    int_circle_center = dictionary["integration_circle_center"]
+    int_circle_radius = dictionary["integration_radius"]
+    flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
+
+
+    calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
 #Calculate the 1D flux
 
