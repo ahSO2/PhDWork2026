@@ -15,7 +15,7 @@ data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData
 views_to_consider = set(samples_sheet["volcano_dictionary_name"].tolist())
 print(views_to_consider)
 
-dictionary_name = "CotopaxiView2"
+dictionary_name = "MerapiView1"
 center = (600, 100)
 radius = 170
 
@@ -25,7 +25,7 @@ for image_name in location_samples["image_name"]:
     image = cv2.imread(data_path + image_name, -1)
     image = cv2.circle(image, center=center, radius=radius, color=(200), thickness=2)
     flank_mask = cv2.imread(volcano_dictionary["flank_mask_path"], -1)
-    image = np.where(flank_mask==1, 0, image)
+    #image = np.where(flank_mask==1, 0, image)
     #plt.imshow(flank_mask)
     #plt.colorbar()
     plt.show()

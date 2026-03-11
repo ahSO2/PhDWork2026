@@ -35,7 +35,7 @@ def add_gauss_noise(sequence):
         noisy_sequence.append(image + noise)
     return noisy_sequence
 
-def plot_dense_flow(flow, image, n):
+def plot_dense_flow(flow, image, n, color_array=None):
     # Need array of x-coords, y-coords, then dx and dy
     # Downsample to plot every n-th coord point
     x_pixels = np.arange(0, image.shape[1], n)
@@ -46,7 +46,12 @@ def plot_dense_flow(flow, image, n):
     flow_dx = flow[0::n, 0::n, 0]
     flow_dy = flow[0::n, 0::n, 1]
 
-    plt.quiver(X, Y, flow_dx, flow_dy, color='g', scale_units='xy', scale=1, angles='xy')
+    if isinstance(color_array, np.ndarray):
+        color_array = color_array[0::n, 0::n]
+        plt.quiver(X, Y, flow_dx, flow_dy, [color_array], scale_units='xy', scale=1, angles='xy')
+        plt.colorbar()
+    else:
+        plt.quiver(X, Y, flow_dx, flow_dy, color='g', scale_units='xy', scale=1, angles='xy')
     plt.gca().invert_yaxis()
     plt.imshow(image, cmap="gray")
     plt.colorbar()
@@ -182,29 +187,76 @@ def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
 
     return flow
 
-def find_y_coords(x, center, radius):
-    y_sq = radius**2 - (x-center[0])**2
+def find_cicle_points(image_dim, x_range, center, radius):
+    y_sq = np.ones_like(x_range) * radius**2 - np.square(x_range- np.ones_like(x_range) * center[0])
     y_rt = np.sqrt(y_sq)
-    y1 = y_rt + center[1]
-    y2 = -y_rt + center[1]
-    return np.array([y1, y2])
+    y1_vals = y_rt + np.ones_like(x_range) * center[1]
+    y1_vals = np.round(y1_vals, 0).astype(int)
+    y2_vals = -y_rt + np.ones_like(x_range) * center[1]
+    y2_vals = np.round(y2_vals, 0).astype(int)
 
-find_y_coords_vect = np.vectorize(find_y_coords)
+    array = np.zeros(shape=image_dim)
+
+    for x_index in range(0, len(x_range)):
+        #array[200, x_range[x_index]] = 1
+        array[y1_vals[x_index], x_range[x_index]] = 1
+        array[y2_vals[x_index], x_range[x_index]] = 1
+    return array
+
+
 def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
+    '''Circle center: (x, y) as in (horizontal, vertical)'''
 
-    #Select the set of points on the circle
-    x_range = np.linspace(max(0,circle_center[0] - circle_radius), min(frame1.shape[0] -1, circle_center[0] + circle_radius))
-    y_coords = find_y_coords_vect(x_range)
-    print(y_coords)
+    #Select the set of points on the circle, stored as 1s in an array
+    lhs = max(0,circle_center[0] - circle_radius)
+    rhs = min(frame1.shape[1] -1, circle_center[0] + circle_radius)
+    x_range = np.linspace(lhs,rhs, rhs-lhs + 1).astype(int)
+    boundary_points = find_cicle_points(frame1.shape, x_range, circle_center, circle_radius)
 
-    #Use the flank mask to select points to integrate over
-    flow[:, :, 0] = np.where(flank_mask==0, 0, flow[:, :, 0])
-    flow[:, :, 1] = np.where(flank_mask==0, 0, flow[:, :, 1])
+    #Use the flank mask to remove overlap
+    boundary_points = np.where(flank_mask==0, 0, boundary_points)
+    #plt.imshow(boundary_points)
+    #plt.show()
 
     #Calculate the unit normal for each point
     #(take vector from center to that point, then scale so magnitude is one)
+    x_coords = np.linspace(0, frame1.shape[1] - 1, frame1.shape[1])
+    y_coords = np.linspace(0, frame1.shape[0] - 1, frame1.shape[0])
+    #First create arrays of the x and y coords, and mask where we don't need to calculate
+    X,Y = np.meshgrid(x_coords, y_coords)
+
+    n_x = X - circle_center[0]
+    n_y = Y - circle_center[1]
+    n_m = np.sqrt(np.square(n_x) + np.square(n_y))
+    n_x = np.divide(n_x, n_m)
+    n_y = np.divide(n_y, n_m)
+
+    normals = np.stack([n_x, n_y], axis=-1)
+    frame_w_circle = np.where(boundary_points==1, np.max(frame1), frame1)
+    #plot_dense_flow(normals, frame_w_circle, n=5)
+
     #Then take dot product with the velocity at that point
+    dot = np.multiply(n_x, flow[:, :, 0]) + np.multiply(n_y, flow[:, :, 1])
+
+    flow_to_plot = flow.copy()
+    flow_to_plot[:,:,0] = np.where(boundary_points == 0, 0, flow[:, :, 0])
+    flow_to_plot[:, :, 1] = np.where(boundary_points == 0, 0, flow[:, :, 1])
+    #Plot showing the flow, colourmapped by the magnitude of the dot product (component of velocity normal to the circle) at each point on circle)
+    plot_dense_flow(flow_to_plot, frame_w_circle, n=5, color_array=dot)
+
     #Lastly, mulptiply by the intensity values, then sum
+    contributions = np.where(boundary_points == 1, np.multiply(frame1, dot), 0)
+    intensity_flux_1D = np.sum(contributions)
+
+    #TODO need to scale by calibration value
+    #TODO need to scale by pixel size
+
+    plt.imshow(contributions)
+    plt.colorbar()
+    plt.show()
+
+def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
+
 
 #For each sample:
 df.reset_index(inplace=True)
@@ -212,6 +264,7 @@ for index in range(0, df.shape[0], mod):
     #Create a sequence of timestep images
     sequence = []
     names = []
+    dictionary_name = df["volcano_dictionary_name"][index]
     for timestep_name in timesteps:
         if timestep_name == "image_name":
             folder_to_read = data_path
@@ -231,12 +284,11 @@ for index in range(0, df.shape[0], mod):
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
     #flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=1, epsilon=0.5, plot=True)
-    flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=20, plot=True)
+    flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False)
 
     #Define the integration boundary
-    dictionary_name = names[0].split("_")[0]
     dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
-    int_circle_center = dictionary["integration_circle_center"]
+    int_circle_center = dictionary["integration_region_center"]
     int_circle_radius = dictionary["integration_radius"]
     flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
 
