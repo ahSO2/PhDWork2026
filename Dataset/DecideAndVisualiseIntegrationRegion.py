@@ -15,10 +15,9 @@ data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData
 views_to_consider = set(samples_sheet["volcano_dictionary_name"].tolist())
 print(views_to_consider)
 
-dictionary_name = "MerapiTenthJune"
+dictionary_name = "CotopaxiView2"
 center = (600, 100)
 radius = 170
-#TODO I can mask out any overlap with the flank
 
 volcano_dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
 location_samples = samples_sheet[samples_sheet["volcano_dictionary_name"] == dictionary_name]
@@ -29,7 +28,7 @@ for image_name in location_samples["image_name"]:
     image = np.where(flank_mask==1, 0, image)
     #plt.imshow(flank_mask)
     #plt.colorbar()
-    #plt.show()
+    plt.show()
     print(image_name)
     plt.imshow(image, cmap="gray")
     plt.show()
