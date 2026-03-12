@@ -187,21 +187,166 @@ def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
 
     return flow
 
-def find_cicle_points(image_dim, x_range, center, radius):
-    y_sq = np.ones_like(x_range) * radius**2 - np.square(x_range- np.ones_like(x_range) * center[0])
+def find_cicle_points(image_dim, x_range, y_range, center, radius):
+
+    #For each x-value, find and plot corresponding y-values:
+    x_to_consider = np.linspace(x_range[0], x_range[1], (x_range[1] - x_range[0] + 1) * 10)
+
+    y_sq = np.ones_like(x_to_consider) * radius**2 - np.square(x_to_consider- np.ones_like(x_to_consider) * center[0])
     y_rt = np.sqrt(y_sq)
-    y1_vals = y_rt + np.ones_like(x_range) * center[1]
+
+    y1_vals = y_rt + np.ones_like(x_to_consider) * center[1]
     y1_vals = np.round(y1_vals, 0).astype(int)
-    y2_vals = -y_rt + np.ones_like(x_range) * center[1]
+
+    y2_vals = -y_rt + np.ones_like(x_to_consider) * center[1]
     y2_vals = np.round(y2_vals, 0).astype(int)
 
     array = np.zeros(shape=image_dim)
+    x_to_plot = np.round(x_to_consider, 0).astype(int)
 
-    for x_index in range(0, len(x_range)):
-        #array[200, x_range[x_index]] = 1
-        array[y1_vals[x_index], x_range[x_index]] = 1
-        array[y2_vals[x_index], x_range[x_index]] = 1
+    for x_index in range(0, len(x_to_consider)):
+        array[y1_vals[x_index], x_to_plot[x_index]] = 1
+        array[y2_vals[x_index], x_to_plot[x_index]] = 1
+
+    #Then for each y-value, find and plot corresponding x-vals
+    y_to_consider = np.linspace(y_range[0], y_range[1], (y_range[1] - y_range[0] + 1) * 10)
+
+    x_sq = np.ones_like(y_to_consider) * radius ** 2 - np.square(y_to_consider - np.ones_like(y_to_consider) * center[1])
+    x_rt = np.sqrt(x_sq)
+
+    x1_vals = x_rt + np.ones_like(y_to_consider) * center[0]
+    x1_vals = np.round(x1_vals, 0).astype(int)
+
+    x2_vals = -x_rt + np.ones_like(y_to_consider) * center[0]
+    x2_vals = np.round(x2_vals, 0).astype(int)
+
+    y_to_plot = np.round(y_to_consider, 0).astype(int)
+
+    for y_index in range(0, len(y_to_consider)):
+        array[y_to_plot[y_index], x1_vals[y_index]] = 1
+        array[y_to_plot[y_index], x2_vals[y_index]] = 1
+
     return array
+
+def dist(p1, p2):
+    sum = (p1[0] - p2[0])**2 + (p1[1] - p2[1])**2
+    return np.sqrt(sum)
+
+
+def find_POI_vertical_line(x, c, r, point_approx):
+    '''
+    Find the POI between line x=x and circle with given center and radius.
+    Return the value closest to the given y-value.
+    :return:
+    '''
+
+    y_sqr = r**2 - (x-c[0])**2
+    if y_sqr >= 0:
+        #If a solution exists:
+        y_rt = np.sqrt(y_sqr)
+        y1 = y_rt + c[1]
+        y2 = -y_rt + c[1]
+        #Take the one closest to the y-val of given.
+        if (point_approx[1] - 0.5) <= y1 < (point_approx[1] + 0.5):
+            return y1
+        elif (point_approx[1]-0.5) <= y2 < (point_approx[1]+0.5):
+            return y2
+        else:
+            return "N"
+    else:
+        return "N"
+
+def find_POI_horizontal_line(y, c, r, point_approx):
+    '''
+        Find the POI between line y=y and circle with given center and radius.
+        Return the value closest to the given x-value.
+        :return:
+        '''
+
+    x_sqr = r ** 2 - (y - c[1]) ** 2
+    if x_sqr >= 0:
+        # If a solution exists:
+        x_rt = np.sqrt(x_sqr)
+        x1 = x_rt + c[0]
+        x2 = - x_rt + c[0]
+        # Take the one closest to the y-val of given.
+        if (point_approx[0] - 0.5) <= x1 < (point_approx[0] + 0.5):
+            return x1
+        elif (point_approx[0] - 0.5) <= x2 < (point_approx[0] + 0.5):
+            return x2
+        else:
+            return "N"
+    else:
+        return "N"
+
+
+
+def calculate_intersection_lengths(boundary_points, c, r):
+    '''
+    Intakes a set of points and returns the length of the "chunk" of the circle
+    which intersects the pixel centered at each point, approximated by a straight line.
+    :param boundary_points: Array containing 1s at pixels for which to calculate the intersection.
+    :param circle_center: (x, y) as in (horizontal, vertical)
+    :param circle_raidus: radius of circle to consider.
+    :return:
+    '''
+    n_poi = np.zeros_like(boundary_points)
+    arc_lengths = np.zeros_like(boundary_points)
+    for x in range(0, boundary_points.shape[1]):
+        for y in range(0, boundary_points.shape[0]):
+            POIs = []
+
+            # Find POI with each edge of that pixel
+            x_l = x - 0.5
+            x_r = x + 0.5
+            y_t = y - 0.5
+            y_b = y + 0.5
+
+            #Find POIs between vertical boundary and the circle:
+            x_l_POI_y_val = find_POI_vertical_line(x_l, c, r, (x, y))
+            if x_l_POI_y_val != "N":
+                POIs.append((x_l, x_l_POI_y_val))
+            x_r_POI_y_val = find_POI_vertical_line(x_r, c, r, (x, y))
+            if x_r_POI_y_val != "N":
+                POIs.append((x_r, x_r_POI_y_val))
+            #Find POIs between horizontal boundary and the circle:
+            y_t_POI_x_val = find_POI_horizontal_line(y_t, c, r, (x, y))
+            if y_t_POI_x_val != "N":
+                POIs.append((y_t_POI_x_val, y_t))
+            y_b_POI_x_val = find_POI_horizontal_line(y_b, c, r, (x, y))
+            if y_b_POI_x_val != "N":
+                POIs.append((y_b_POI_x_val, y_b))
+
+
+            #print(len(POIs))
+            n_poi[y, x] = len(POIs)
+
+            # For each pixel with intersections
+            # Calculate the distance of the arc approximated by a line
+            if n_poi[y, x] == 2:
+                arc_len = dist(POIs[0], POIs[1])
+                arc_lengths[y, x] = arc_len
+
+
+    #Check that each pixel has two POIs with the circle:
+    plt.imshow(boundary_points * 2 - n_poi)
+    plt.colorbar()
+    plt.show()
+    #Note there is a slight mismatch where some pixels flagged as having intersection
+    #aren't recorded as boundary points. This is because the method used to calculate
+    #intersections accounts for even miniscule intersections, whereas the step size used
+    #to find points on the circle is not infinitesimally small. So take the intersection
+    #calculation as the correct standard.
+
+    #TODO sense check that the total distance is roughly the circle circumference
+    plt.imshow(arc_lengths)
+    plt.colorbar()
+    plt.show()
+
+    circ = np.pi * 2 * r
+    print("Error in arc length approximation:")
+    print(str(np.round(np.sum(arc_lengths) - circ, 4)))
+
 
 
 def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
@@ -210,8 +355,12 @@ def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
     #Select the set of points on the circle, stored as 1s in an array
     lhs = max(0,circle_center[0] - circle_radius)
     rhs = min(frame1.shape[1] -1, circle_center[0] + circle_radius)
-    x_range = np.linspace(lhs,rhs, rhs-lhs + 1).astype(int)
-    boundary_points = find_cicle_points(frame1.shape, x_range, circle_center, circle_radius)
+    x_range = (lhs, rhs)
+    top = max(0, circle_center[1] - circle_radius)
+    bottom = min(frame1.shape[0] -1, circle_center[1] + circle_radius)
+    y_range=(top, bottom)
+        #np.linspace(lhs,rhs, rhs-lhs + 1).astype(int))
+    boundary_points = find_cicle_points(frame1.shape, x_range, y_range, circle_center, circle_radius)
 
     #Use the flank mask to remove overlap
     boundary_points = np.where(flank_mask==0, 0, boundary_points)
@@ -242,21 +391,26 @@ def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
     flow_to_plot[:,:,0] = np.where(boundary_points == 0, 0, flow[:, :, 0])
     flow_to_plot[:, :, 1] = np.where(boundary_points == 0, 0, flow[:, :, 1])
     #Plot showing the flow, colourmapped by the magnitude of the dot product (component of velocity normal to the circle) at each point on circle)
-    plot_dense_flow(flow_to_plot, frame_w_circle, n=5, color_array=dot)
+    #plot_dense_flow(flow_to_plot, frame_w_circle, n=5, color_array=dot)
+
+    #Calculate the arc length of the "piece" of circle passing though each pixel
+    #Approximated using a straight line
+    calculate_intersection_lengths(boundary_points, circle_center, circle_radius)
 
     #Lastly, mulptiply by the intensity values, then sum
+    #TODO change this to use values where intersection length is nonzero, and scale by the intersection length 
     contributions = np.where(boundary_points == 1, np.multiply(frame1, dot), 0)
     intensity_flux_1D = np.sum(contributions)
 
     #TODO need to scale by calibration value
     #TODO need to scale by pixel size
 
-    plt.imshow(contributions)
-    plt.colorbar()
-    plt.show()
+    #plt.imshow(contributions)
+    #plt.colorbar()
+    #plt.show()
 
 def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
-
+    pass
 
 #For each sample:
 df.reset_index(inplace=True)
