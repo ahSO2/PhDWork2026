@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import ndimage
+from scipy.spatial import distance
 import sys
 sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
@@ -142,7 +143,7 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=300, i
     return flow
 
 def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
-    # Flow is indexed as (x, y, 0 for u=dI/dx or 1 for v=dI/dy)
+    # Flow is indexed as (x, y, 0 for u=dx/dt or 1 for v=dy/dt)
     # X is the horixzontal direction, y the vertical
 
     # Need array of x-coords, y-coords, then dx and dy
@@ -178,15 +179,18 @@ def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
     print(flow.shape)
 
     if plot == True:
-        fig, axs = plt.subplots(figsize=(10, 10))
-        vectors = axs.quiver(start_x_coords, start_y_coords, x_displ, y_displ, color='darkorange', scale_units='xy',
-                         scale=1, angles='xy')
-        axs.set_title("LK Method")
-        axs.imshow(i1, cmap="gray")
-        plt.show()
+        plot_dense_flow(flow, i1, n=5)
+        #fig, axs = plt.subplots(figsize=(10, 10))
+        #vectors = axs.quiver(start_x_coords, start_y_coords, x_displ, y_displ, color='darkorange', scale_units='xy',
+        #                 scale=1, angles='xy')
+        #axs.set_title("LK Method")
+        #axs.imshow(i1, cmap="gray")
+        #plt.show()
 
     return flow
 
+
+######################### Flux calculation functions:
 def find_cicle_points(image_dim, x_range, y_range, center, radius):
 
     #For each x-value, find and plot corresponding y-values:
@@ -281,19 +285,19 @@ def find_POI_horizontal_line(y, c, r, point_approx):
 
 
 
-def calculate_intersection_lengths(boundary_points, c, r):
+def calculate_intersection_lengths(all_points, c, r):
     '''
     Intakes a set of points and returns the length of the "chunk" of the circle
     which intersects the pixel centered at each point, approximated by a straight line.
-    :param boundary_points: Array containing 1s at pixels for which to calculate the intersection.
+    :param all_points: Array containing pixels for which to calculate the intersection.
     :param circle_center: (x, y) as in (horizontal, vertical)
     :param circle_raidus: radius of circle to consider.
     :return:
     '''
-    n_poi = np.zeros_like(boundary_points)
-    arc_lengths = np.zeros_like(boundary_points)
-    for x in range(0, boundary_points.shape[1]):
-        for y in range(0, boundary_points.shape[0]):
+    n_poi = np.zeros_like(all_points)
+    arc_lengths = np.zeros_like(all_points).astype(np.float32)
+    for x in range(0, all_points.shape[1]):
+        for y in range(0, all_points.shape[0]):
             POIs = []
 
             # Find POI with each edge of that pixel
@@ -329,9 +333,9 @@ def calculate_intersection_lengths(boundary_points, c, r):
 
 
     #Check that each pixel has two POIs with the circle:
-    plt.imshow(boundary_points * 2 - n_poi)
-    plt.colorbar()
-    plt.show()
+    #plt.imshow(boundary_points * 2 - n_poi)
+    #plt.colorbar()
+    #plt.show()
     #Note there is a slight mismatch where some pixels flagged as having intersection
     #aren't recorded as boundary points. This is because the method used to calculate
     #intersections accounts for even miniscule intersections, whereas the step size used
@@ -339,13 +343,15 @@ def calculate_intersection_lengths(boundary_points, c, r):
     #calculation as the correct standard.
 
     #TODO sense check that the total distance is roughly the circle circumference
-    plt.imshow(arc_lengths)
-    plt.colorbar()
-    plt.show()
+    #plt.imshow(arc_lengths)
+    #plt.colorbar()
+    #plt.show()
 
     circ = np.pi * 2 * r
     print("Error in arc length approximation:")
     print(str(np.round(np.sum(arc_lengths) - circ, 4)))
+
+    return arc_lengths
 
 
 
@@ -379,6 +385,9 @@ def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
     n_m = np.sqrt(np.square(n_x) + np.square(n_y))
     n_x = np.divide(n_x, n_m)
     n_y = np.divide(n_y, n_m)
+    #Set the nromal at the center point equal to zero rather than invalid value
+    n_x[circle_center[1], circle_center[0]] = 0
+    n_y[circle_center[1], circle_center[0]] = 0
 
     normals = np.stack([n_x, n_y], axis=-1)
     frame_w_circle = np.where(boundary_points==1, np.max(frame1), frame1)
@@ -395,23 +404,111 @@ def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
 
     #Calculate the arc length of the "piece" of circle passing though each pixel
     #Approximated using a straight line
-    calculate_intersection_lengths(boundary_points, circle_center, circle_radius)
+    arc_lengths = calculate_intersection_lengths(boundary_points, circle_center, circle_radius)
+
+    #TODO mask out the flank
 
     #Lastly, mulptiply by the intensity values, then sum
     #TODO change this to use values where intersection length is nonzero, and scale by the intersection length 
-    contributions = np.where(boundary_points == 1, np.multiply(frame1, dot), 0)
+    contributions = np.multiply(arc_lengths, np.multiply(frame1, dot))
     intensity_flux_1D = np.sum(contributions)
 
     #TODO need to scale by calibration value
     #TODO need to scale by pixel size
 
-    #plt.imshow(contributions)
+    plt.imshow(contributions)
+    plt.colorbar()
+    plt.show()
+
+def dist_w_fixed_point(X, Y, fixed_point):
+    '''
+    :param X: Array of x-values for points to calc distance
+    :param Y: Array of y-values for points to calc distance
+    :param fixed_point: Fixed point coords as (x, y) as in (horizontal, vertical)
+    :return:
+    '''
+
+    term1 = np.square(X - fixed_point[0])
+    term2 = np.square(Y - fixed_point[1])
+    return np.sqrt(term1 + term2)
+
+def closest_dist_w_fixed_point(X, Y, fixed_point):
+    '''Calculate distance of each corner of each pixel in the
+    given array with the fixed point, and return the smallest.'''
+    d1s = dist_w_fixed_point(X - 0.5, Y - 0.5, fixed_point)
+    d2s = dist_w_fixed_point(X + 0.5, Y - 0.5, fixed_point)
+    d3s = dist_w_fixed_point(X - 0.5, Y + 0.5, fixed_point)
+    d4s = dist_w_fixed_point(X + 0.5, Y + 0.5, fixed_point)
+    ds = np.stack([d1s, d2s, d3s, d4s], axis=-1)
+    return np.min(ds, axis=2)
+
+def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
+    #arc_lengths = calculate_intersection_lengths(frame1, circle_center, circle_radius)
+    #circle_boundary = np.where(arc_lengths>0, 1, 0) #Array of points of intersection of the
+    #circle. Want to use this as the boundary.
+
+    #plt.imshow(circle_boundary)
+    #plt.show()
+
+    x_coords = np.linspace(0, frame1.shape[1] - 1, frame1.shape[1])
+    y_coords = np.linspace(0, frame1.shape[0] - 1, frame1.shape[0])
+    X_start, Y_start = np.meshgrid(x_coords, y_coords)
+
+    start_dists = closest_dist_w_fixed_point(X_start, Y_start, circle_center)
+    start_in_circle = np.where(start_dists < circle_radius, 1, 0)
+    #Sense check that the area we are using is bounded exactly by the boundary
+    #used in the 1D method (found though POI of each pixel with the circle) - looks good, yay!
+    #plt.imshow(circle_boundary * 2 - start_in_circle)
     #plt.colorbar()
     #plt.show()
 
-def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
-    pass
+    X_dest = X_start + flow[:, :, 0]
+    Y_dest = Y_start + flow[:, :, 1]
+    end_dists = closest_dist_w_fixed_point(X_dest, Y_dest, circle_center)
+    end_in_circle = np.where(end_dists < circle_radius, 1, 0)
 
+    #Next need to work out which points have moved into or out of the circle
+    movement = start_in_circle - end_in_circle
+    plt.imshow(movement)
+    plt.colorbar()
+    plt.show()
+
+    #To calculate emission mass, multiply each pixel value by this movement:
+    mass = np.sum(np.multiply(frame1, movement))
+    #TODO need to scale for timestep length to give an average emission rate
+
+    return mass
+
+############################# Optical flow evaluation functions
+def flow_magnitude(flow):
+    return np.sqrt(np.square(flow[:,:,0]) + np.square(flow[:, :, 1]))
+
+def movement_eval(image_name, image, flow):
+    '''Does the area that is counted as moving by the flow contain the whole plume
+    that I have annotated?'''
+
+    #We want the area that is counted as moving contain the whole plume
+    flow_mag = flow_magnitude(flow)
+
+    plt.imshow(flow_mag)
+    plt.colorbar()
+    plt.show()
+
+    moving = np.where(flow_mag > 0, 1, 0)
+    plt.imshow(moving)
+    plt.colorbar()
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+######################### Run the code:
 #For each sample:
 df.reset_index(inplace=True)
 for index in range(0, df.shape[0], mod):
@@ -438,7 +535,7 @@ for index in range(0, df.shape[0], mod):
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
     #flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=1, epsilon=0.5, plot=True)
-    flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False)
+    flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True)
 
     #Define the integration boundary
     dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
@@ -447,11 +544,11 @@ for index in range(0, df.shape[0], mod):
     flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
 
 
-    calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
+    #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
+    #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
-#Calculate the 1D flux
+    movement_eval(names[0], sequence[0], flow)
 
-#Calculate the 2D flux - #TODO how does Plumetrack calculate this?
 
 #Calculate the interpolation error
 
