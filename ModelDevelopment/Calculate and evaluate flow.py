@@ -476,8 +476,11 @@ def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
     #To calculate emission mass, multiply each pixel value by this movement:
     mass = np.sum(np.multiply(frame1, movement))
     #TODO need to scale for timestep length to give an average emission rate
+    #TODO also mask out flank area?
 
-    return mass
+    upper_bound_mass = np.sum(np.multiply(frame1, start_in_circle))
+
+    return mass, upper_bound_mass
 
 ############################# Optical flow evaluation functions
 def flow_magnitude(flow):
@@ -494,10 +497,19 @@ def movement_eval(image_name, image, flow):
     plt.colorbar()
     plt.show()
 
-    moving = np.where(flow_mag > 0, 1, 0)
+    moving = np.where(flow_mag > 2, 1, 0)
     plt.imshow(moving)
     plt.colorbar()
     plt.show()
+
+    counts, bins = np.histogram(flow_mag, bins=500)
+    plt.stairs(counts, bins)
+    plt.show()
+
+    #TODO how to decide on threshold for movement?
+    #Probably just want to threshold above the level of noise
+    #How to tell noise from genuine movemnt?
+
 
 
 
