@@ -14,7 +14,7 @@ import VolcDictionaryWithCorrectClears
 samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/KilaueaLeftOut_Train.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
-mod = 1
+mod = 20
 timesteps = ["prev_tensec_name", "image_name"]
 
 df = pd.read_excel(samples_sheet)
@@ -86,7 +86,7 @@ def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow=None, plot=False,
 
     return flow
 
-def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=300, initial_flow=None, plot=False):
+def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=2000, initial_flow=None, plot=False):
     #Flow is indexed as (x, y, 0 for u=dI/dx or 1 for v=dI/dy)
     #X is the horixzontal direction, y the vertical
 
@@ -95,7 +95,7 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=300, i
         flow = initial_flow
     else:
         flow = np.zeros(shape=(i1.shape[0], i1.shape[1], 2))
-    plot_dense_flow(flow, i1, n=20)
+    plot_dense_flow(flow, i1, n=10)
 
     #Smooth the images
     i1 = cv2.GaussianBlur(i1, (5, 5), 0)
@@ -115,30 +115,33 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=300, i
     stacked[:, :, 0] = i1
     stacked[:, :, 1] = i2
     Ix = 1/4 * (ndimage.convolve(i1, Ix_kernel, mode="reflect") + ndimage.convolve(i2, Ix_kernel, mode="reflect"))
-    Ix2 = 1/4 * (ndimage.convolve(Ix, Ix_kernel, mode="reflect") + ndimage.convolve(Ix, Ix_kernel, mode="reflect"))
     Iy = 1/4 * (ndimage.convolve(i1, Iy_kernel, mode="reflect") + ndimage.convolve(i2, Iy_kernel, mode="reflect"))
-    Iy2 = 1/4 * (ndimage.convolve(Iy, Iy_kernel, mode="reflect") + ndimage.convolve(Iy, Iy_kernel, mode="reflect"))
     It = 1/4 * (ndimage.convolve(stacked, It_kernel))[:, :, 0]
 
-    mean_kernel = 1 / 9 * np.ones(shape=(3, 3))
+    local_avg_kernel = np.array([[1/12, 1/6, 1/12],
+                                 [1/6, 0, 1/6],
+                                 [1/12, 1/6, 1/12]])
     for iter in range(1, iterations + 1):
         #Calculate mean flow around each pixel
-        mean_u = cv2.filter2D(flow[:, :, 0], -1, kernel=mean_kernel, anchor=(-1,-1), borderType=cv2.BORDER_REFLECT)
-        mean_v = cv2.filter2D(flow[:, :, 1], -1, kernel=mean_kernel, anchor=(-1,-1), borderType=cv2.BORDER_REFLECT)
+        local_avg_u = cv2.filter2D(flow[:, :, 0], -1, kernel=local_avg_kernel, anchor=(-1,-1), borderType=cv2.BORDER_REFLECT)
+        local_avg_v = cv2.filter2D(flow[:, :, 1], -1, kernel=local_avg_kernel, anchor=(-1,-1), borderType=cv2.BORDER_REFLECT)
 
-        num_x = np.multiply(Ix, (np.multiply(Ix, mean_u) + np.multiply(Iy, mean_v) + It))
-        den_x = alpha * alpha + np.multiply(Ix, Ix) + np.multiply(Iy, Iy) + epsilon
-        updated_flow_x = mean_u - np.divide(num_x, den_x)
+        laplacian_u = 3 * (local_avg_u - flow[:, :, 0])
+        laplacian_v = 3 * (local_avg_v - flow[:, :, 1])
 
-        num_y = np.multiply(Iy, (np.multiply(Ix, mean_u) + np.multiply(Iy, mean_v) + It))
-        updated_flow_y = mean_v - np.divide(num_y, den_x)
+        num_x = np.multiply(Ix, (np.multiply(Ix, local_avg_u) + np.multiply(Iy, local_avg_v) + It))
+        den_x = alpha * alpha + np.multiply(Ix, Ix) + np.multiply(Iy, Iy)
+        updated_flow_x = local_avg_u - np.divide(num_x, den_x)
+
+        num_y = np.multiply(Iy, (np.multiply(Ix, local_avg_u) + np.multiply(Iy, local_avg_v) + It))
+        updated_flow_y = local_avg_v - np.divide(num_y, den_x)
 
 
         flow[:,:,0] = updated_flow_x
         flow[:,:,1] = updated_flow_y
 
-        if iter % 50 == 0:
-            plot_dense_flow(flow, i1, n=20)
+        if iter % 200 == 0:
+            plot_dense_flow(flow, i1, n=10)
 
     return flow
 
@@ -546,20 +549,24 @@ for index in range(0, df.shape[0], mod):
 
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
-    #flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=1, epsilon=0.5, plot=True)
-    flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True)
+    flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=1, epsilon=0, plot=True)
+    #TODO am I actually using the epsilon param?
+    #TODO measure convergence to decide when to stop iterating
+    #TODO check over computation of solution, have I implemented correctly?
+
+    #flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True)
 
     #Define the integration boundary
-    dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
-    int_circle_center = dictionary["integration_region_center"]
-    int_circle_radius = dictionary["integration_radius"]
-    flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
+    #dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
+    #int_circle_center = dictionary["integration_region_center"]
+    #int_circle_radius = dictionary["integration_radius"]
+    #flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
 
 
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
-    movement_eval(names[0], sequence[0], flow)
+    #movement_eval(names[0], sequence[0], flow)
 
 
 #Calculate the interpolation error
