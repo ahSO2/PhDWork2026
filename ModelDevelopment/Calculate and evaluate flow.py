@@ -14,12 +14,17 @@ import VolcDictionaryWithCorrectClears
 samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/KilaueaLeftOut_Train.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
+segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 mod = 20
-timesteps = ["prev_tensec_name", "image_name"]
+timesteps = ["image_name", "next_tensec_name"]
 
 df = pd.read_excel(samples_sheet)
 df = df[df["overall_obs"]=="No"]
 
+
+def show(image):
+    plt.imshow(image, cmap="gray")
+    plt.show()
 
 def convert_sequence_to_UINT8(sequence):
     converted_sequence = []
@@ -86,16 +91,18 @@ def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow=None, plot=False,
 
     return flow
 
-def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=2000, initial_flow=None, plot=False):
+def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=10, initial_flow=None, plot=False):
     #Flow is indexed as (x, y, 0 for u=dI/dx or 1 for v=dI/dy)
     #X is the horixzontal direction, y the vertical
+
+    residuals = []
 
     #Initialise the flow
     if initial_flow != None:
         flow = initial_flow
     else:
         flow = np.zeros(shape=(i1.shape[0], i1.shape[1], 2))
-    plot_dense_flow(flow, i1, n=10)
+    #plot_dense_flow(flow, i1, n=10)
 
     #Smooth the images
     i1 = cv2.GaussianBlur(i1, (5, 5), 0)
@@ -130,17 +137,34 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=2000, 
         laplacian_v = 3 * (local_avg_v - flow[:, :, 1])
 
         num_x = np.multiply(Ix, (np.multiply(Ix, local_avg_u) + np.multiply(Iy, local_avg_v) + It))
-        den_x = alpha * alpha + np.multiply(Ix, Ix) + np.multiply(Iy, Iy)
+        den_x = alpha + np.multiply(Ix, Ix) + np.multiply(Iy, Iy)
         updated_flow_x = local_avg_u - np.divide(num_x, den_x)
 
         num_y = np.multiply(Iy, (np.multiply(Ix, local_avg_u) + np.multiply(Iy, local_avg_v) + It))
         updated_flow_y = local_avg_v - np.divide(num_y, den_x)
 
-
         flow[:,:,0] = updated_flow_x
         flow[:,:,1] = updated_flow_y
 
+        if iter % 500 == 0:
+            plot_dense_flow(flow, i1, n=10)
+
+        #Calculating residual:
+        r1 = np.multiply(alpha + np.square(Ix), flow[:, :, 0])
+        r1 = r1 + np.multiply(np.multiply(Ix, Iy), flow[:, :, 1])
+        r1 = r1 - (alpha * local_avg_u) + np.multiply(Ix, It)
+        r1 = np.sum(r1)
+        r2 = np.multiply(np.multiply(Ix, Iy), flow[:, :, 0])
+        r2 = r2 + np.multiply(alpha + np.square(Iy), flow[:, :, 1])
+        r2 = r2 - (alpha * local_avg_v) + np.multiply(Iy, It)
+        r2 = np.sum(r2)
+        r = r1 + r2
+        residuals.append(r)
+
         if iter % 200 == 0:
+            #iterations = np.arange(iter)
+            #plt.plot(iterations, residuals)
+            #plt.show()
             plot_dense_flow(flow, i1, n=10)
 
     return flow
@@ -361,6 +385,7 @@ def calculate_intersection_lengths(all_points, c, r):
 def calculate_flux_1D(frame1, flow, circle_center, circle_radius, flank_mask):
     '''Circle center: (x, y) as in (horizontal, vertical)'''
 
+    #TODO remember need to calculate absorbance images before applying this
     #Select the set of points on the circle, stored as 1s in an array
     lhs = max(0,circle_center[0] - circle_radius)
     rhs = min(frame1.shape[1] -1, circle_center[0] + circle_radius)
@@ -489,29 +514,73 @@ def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
 def flow_magnitude(flow):
     return np.sqrt(np.square(flow[:,:,0]) + np.square(flow[:, :, 1]))
 
-def movement_eval(image_name, image, flow):
+def vector_direction(h, v):
+    if (h ==0 and v==0):
+        d = 0
+    elif h == 0:
+        if v > 0:
+            d = 90
+        else:
+            d = 270
+    elif v == 0:
+        if h > 0:
+            d = 0
+        else:
+            d = 180
+    elif h > 0:
+        if v > 0:
+            #tr quadrant
+            d = np.arctan(v/h) * (180/np.pi)
+        else:
+            #br quadrant
+            d = 360 - (np.arctan(np.abs(v)/h) * (180/np.pi))
+    else:
+        if v > 0:
+            #tl quadrant:
+            d = 180 - (np.arctan(v/np.abs(h)) * (180/np.pi))
+        else:
+            #bl quadrant:
+            d = 180 + (np.arctan(np.abs(v)/np.abs(h)) * (180/np.pi))
+    return d
+
+flow_directions = np.vectorize(vector_direction)
+
+
+def movement_eval(image, plume_mask, flow, threshold=1):
     '''Does the area that is counted as moving by the flow contain the whole plume
     that I have annotated?'''
 
     #We want the area that is counted as moving contain the whole plume
     flow_mag = flow_magnitude(flow)
+    flow_direction = flow_directions(flow[:,:,0], flow[:,:,1])
+    show(flow_direction)
 
-    plt.imshow(flow_mag)
-    plt.colorbar()
-    plt.show()
+    #plt.imshow(flow_mag)
+    #plt.colorbar()
+    #plt.show()
 
-    moving = np.where(flow_mag > 2, 1, 0)
-    plt.imshow(moving)
-    plt.colorbar()
-    plt.show()
+    moving = np.where(flow_mag > threshold, 1, 0)
+    #plt.imshow(moving)
+    #plt.colorbar()
+    #plt.show()
 
-    counts, bins = np.histogram(flow_mag, bins=500)
-    plt.stairs(counts, bins)
-    plt.show()
+    #counts, bins = np.histogram(flow_mag, bins=500)
+    #plt.stairs(counts, bins)
+    #plt.show()
 
-    #TODO how to decide on threshold for movement?
-    #Probably just want to threshold above the level of noise
-    #How to tell noise from genuine movemnt?
+    #What proportion of the manually labelled plume area is identified as moving?
+    plume_pixel_count = np.sum(plume_mask)
+    if plume_pixel_count > 0:
+        masked_movement_array = np.where(plume_mask==1, moving, 0) #Mask the non-plume pixels
+        correct_prop = np.sum(masked_movement_array)/plume_pixel_count
+    else:
+        correct_prop = np.nan
+
+    print(correct_prop)
+
+
+
+
 
 
 
@@ -531,6 +600,7 @@ for index in range(0, df.shape[0], mod):
     sequence = []
     names = []
     dictionary_name = df["volcano_dictionary_name"][index]
+    batch = df["labelling_batch_name"][index]
     for timestep_name in timesteps:
         if timestep_name == "image_name":
             folder_to_read = data_path
@@ -542,6 +612,18 @@ for index in range(0, df.shape[0], mod):
         timestep_image = cv2.imread(folder_to_read + "/" + name_to_read, -1)
         sequence.append(timestep_image)
         names.append(name_to_read)
+        if timestep_name == "image_name":
+            mask_path = segmentation_masks_path + batch + "/PlumeAndExpPixels_" + name_to_read.split(".")[0] + ".npy"
+            print("Reading plume mask from: " + mask_path)
+            two_channel_mask = np.load(mask_path) #Manually drawn plume mask (value 1 indicates plume)
+            all_plume_mask = two_channel_mask[0,:,:] + two_channel_mask[1,:,:]
+
+
+
+
+
+
+
 
     #TODO Conversion to UINT8 may affect optimisation or other calculations
     sequence = convert_sequence_to_UINT8(sequence)
@@ -549,7 +631,7 @@ for index in range(0, df.shape[0], mod):
 
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
-    flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=1, epsilon=0, plot=True)
+    flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=5, epsilon=0, plot=True)
     #TODO am I actually using the epsilon param?
     #TODO measure convergence to decide when to stop iterating
     #TODO check over computation of solution, have I implemented correctly?
@@ -566,7 +648,9 @@ for index in range(0, df.shape[0], mod):
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
-    #movement_eval(names[0], sequence[0], flow)
+    movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
+
+
 
 
 #Calculate the interpolation error
