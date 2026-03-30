@@ -11,11 +11,11 @@ import sys
 sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
-samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/KilaueaLeftOut_Train.xlsx"
+samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/FinalSplit/Train.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
-mod = 20
+mod = 1
 timesteps = ["image_name", "next_tensec_name"]
 
 df = pd.read_excel(samples_sheet)
@@ -91,11 +91,12 @@ def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow=None, plot=False,
 
     return flow
 
-def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=10, initial_flow=None, plot=False):
+def calculate_optical_flow_pair_HS(i1, i2, alpha_rb=0.1, alpha_rc=5, epsilon=1, max_iterations=100, initial_flow=None, plot=False):
     #Flow is indexed as (x, y, 0 for u=dI/dx or 1 for v=dI/dy)
     #X is the horixzontal direction, y the vertical
 
-    residuals = []
+    residuals_b = []
+    residuals_c = []
 
     #Initialise the flow
     if initial_flow != None:
@@ -128,7 +129,15 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=10, in
     local_avg_kernel = np.array([[1/12, 1/6, 1/12],
                                  [1/6, 0, 1/6],
                                  [1/12, 1/6, 1/12]])
-    for iter in range(1, iterations + 1):
+    optimise_rb = True
+    optimise_rc = True
+    iter = 0
+    while optimise_rb == True or optimise_rc == True:
+        if optimise_rb == True:
+            alpha = alpha_rb
+        else:
+            alpha = alpha_rc
+        iter += 1
         #Calculate mean flow around each pixel
         local_avg_u = cv2.filter2D(flow[:, :, 0], -1, kernel=local_avg_kernel, anchor=(-1,-1), borderType=cv2.BORDER_REFLECT)
         local_avg_v = cv2.filter2D(flow[:, :, 1], -1, kernel=local_avg_kernel, anchor=(-1,-1), borderType=cv2.BORDER_REFLECT)
@@ -146,32 +155,39 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha=1, epsilon=1, iterations=10, in
         flow[:,:,0] = updated_flow_x
         flow[:,:,1] = updated_flow_y
 
-        if iter % 500 == 0:
-            plot_dense_flow(flow, i1, n=10)
-
         #Calculating residual:
-        r1 = np.multiply(alpha + np.square(Ix), flow[:, :, 0])
-        r1 = r1 + np.multiply(np.multiply(Ix, Iy), flow[:, :, 1])
-        r1 = r1 - (alpha * local_avg_u) + np.multiply(Ix, It)
-        r1 = np.sum(r1)
-        r2 = np.multiply(np.multiply(Ix, Iy), flow[:, :, 0])
-        r2 = r2 + np.multiply(alpha + np.square(Iy), flow[:, :, 1])
-        r2 = r2 - (alpha * local_avg_v) + np.multiply(Iy, It)
-        r2 = np.sum(r2)
-        r = r1 + r2
-        residuals.append(r)
+        rb = np.square(np.multiply(Ix, flow[:,:,0]) + np.multiply(Iy, flow[:, :, 1]) + It)
+        residuals_b.append(np.sum(rb))
 
-        if iter % 200 == 0:
-            #iterations = np.arange(iter)
-            #plt.plot(iterations, residuals)
-            #plt.show()
-            plot_dense_flow(flow, i1, n=10)
+        ux = 1/2 * (ndimage.convolve(flow[:,:,0], Ix_kernel, mode="reflect"))
+        vx = 1/2 * (ndimage.convolve(flow[:,:,1], Ix_kernel, mode="reflect"))
+        uy = 1/2 * (ndimage.convolve(flow[:,:,0], Iy_kernel, mode="reflect"))
+        vy = 1/2 * (ndimage.convolve(flow[:,:,1], Iy_kernel, mode="reflect"))
 
-    return flow
+        rc = np.square(ux) + np.square(vx) + np.square(uy) + np.square(vy)
+        residuals_c.append(np.sum(rc))
 
-def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
+        if iter > 1:
+            if residuals_b[-1] > 0.999 * residuals_b[-2] or (iter == max_iterations):
+                #show(rb)
+                optimise_rb = False
+            if optimise_rb == False:
+                if residuals_c[-1] > 0.99 * residuals_c[-2] or (iter == max_iterations):
+                    optimise_rc = False
+                    #x_axis = np.arange(iter)
+                    #plt.plot(x_axis, residuals_b, label="BCTerm")
+                    #plt.plot(x_axis, residuals_c, label="SmoothnessTerm")
+                    #plt.legend()
+                    #plt.show()
+                    #plot_dense_flow(flow, i1, n=10)
+
+    return flow, residuals_b[-1]
+
+def calculate_optical_flow_pair_LK(i1, i2, n=1, plot=False):
     # Flow is indexed as (x, y, 0 for u=dx/dt or 1 for v=dy/dt)
     # X is the horixzontal direction, y the vertical
+    #i1 = i1[200:,:]
+    #i2 = i2[200:,:]
 
     # Need array of x-coords, y-coords, then dx and dy
     # Downsample to calculate and plot for every n-th coord point
@@ -189,7 +205,13 @@ def calculate_optical_flow_pair_LK(i1, i2, n=20, plot=False):
             points_to_track[counter,0,1] = y
             counter += 1
 
-    updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track, nextPts=None)
+    #updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track, nextPts=None, minEigThreshold=0.0003, flags=cv2.OPTFLOW_LK_GET_MIN_EIGENVALS)
+    updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track,
+                                                             nextPts=None, maxLevel=0)
+    status = np.reshape(status[:, 0], (y_pixels.shape[0], x_pixels.shape[0]))
+    show(status)
+    error = np.reshape(error[:, 0], (y_pixels.shape[0], x_pixels.shape[0]))
+    show(error)
     print("Calculated flow!")
 
     start_x_coords = points_to_track[:, :, 0]
@@ -515,13 +537,14 @@ def flow_magnitude(flow):
     return np.sqrt(np.square(flow[:,:,0]) + np.square(flow[:, :, 1]))
 
 def vector_direction(h, v):
-    if (h ==0 and v==0):
+    #Remember vertical direction is indexed from top down
+    if h ==0 and v==0:
         d = 0
     elif h == 0:
         if v > 0:
-            d = 90
-        else:
             d = 270
+        else:
+            d = 90
     elif v == 0:
         if h > 0:
             d = 0
@@ -529,18 +552,19 @@ def vector_direction(h, v):
             d = 180
     elif h > 0:
         if v > 0:
-            #tr quadrant
-            d = np.arctan(v/h) * (180/np.pi)
-        else:
             #br quadrant
-            d = 360 - (np.arctan(np.abs(v)/h) * (180/np.pi))
+            d = 360 - (np.arctan(v / h) * (180 / np.pi))
+        else:
+            #tr quadrant
+            d = np.arctan(np.abs(v)/h) * (180/np.pi)
     else:
         if v > 0:
-            #tl quadrant:
-            d = 180 - (np.arctan(v/np.abs(h)) * (180/np.pi))
-        else:
             #bl quadrant:
-            d = 180 + (np.arctan(np.abs(v)/np.abs(h)) * (180/np.pi))
+            d = 180 + (np.arctan(v / np.abs(h)) * (180 / np.pi))
+
+        else:
+            #tl quadrant:
+            d = 180 - (np.arctan(np.abs(v)/np.abs(h)) * (180/np.pi))
     return d
 
 flow_directions = np.vectorize(vector_direction)
@@ -553,7 +577,15 @@ def movement_eval(image, plume_mask, flow, threshold=1):
     #We want the area that is counted as moving contain the whole plume
     flow_mag = flow_magnitude(flow)
     flow_direction = flow_directions(flow[:,:,0], flow[:,:,1])
-    show(flow_direction)
+
+    #fig, axs = plt.subplots(ncols=2)
+    #left = axs[0].imshow(image, cmap="gray")
+    #right = axs[1].imshow(flow_direction, cmap="cool")
+    #fig.colorbar(left, ax=axs[0], shrink=0.5)
+    #fig.colorbar(right, ax=axs[1], shrink=0.5)
+    #plt.show()
+
+    #plot_dense_flow(flow, flow_direction, 10)
 
     #plt.imshow(flow_mag)
     #plt.colorbar()
@@ -576,7 +608,7 @@ def movement_eval(image, plume_mask, flow, threshold=1):
     else:
         correct_prop = np.nan
 
-    print(correct_prop)
+    return correct_prop
 
 
 
@@ -593,9 +625,14 @@ def movement_eval(image, plume_mask, flow, threshold=1):
 
 
 ######################### Run the code:
+
+results_df = pd.DataFrame(columns=["f1_name", "r_b", "prop"])
+
 #For each sample:
 df.reset_index(inplace=True)
+print(df.shape[0])
 for index in range(0, df.shape[0], mod):
+    print(index)
     #Create a sequence of timestep images
     sequence = []
     names = []
@@ -631,11 +668,9 @@ for index in range(0, df.shape[0], mod):
 
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
-    flow = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha=5, epsilon=0, plot=True)
+    flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=0.1, alpha_rc=5, epsilon=0, max_iterations=100, plot=True)
     #TODO am I actually using the epsilon param?
-    #TODO measure convergence to decide when to stop iterating
     #TODO check over computation of solution, have I implemented correctly?
-
     #flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True)
 
     #Define the integration boundary
@@ -648,7 +683,11 @@ for index in range(0, df.shape[0], mod):
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
-    movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
+
+    prop = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
+    results_df.loc[len(results_df)] = [names[0], rb, prop]
+
+results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/12 - Varying Alpha in HnS/AlphaAdp.xlsx")
 
 
 
