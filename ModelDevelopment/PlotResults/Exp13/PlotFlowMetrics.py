@@ -1,23 +1,42 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-alpha0p2 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/11 - Varying Alpha in HnS/Alpha0p2.xlsx")
-alpha1 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/11 - Varying Alpha in HnS/Alpha1.xlsx")
-alpha5 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/11 - Varying Alpha in HnS/Alpha5.xlsx")
-alphaadp = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/12 - Varying Alpha in HnS/AlphaAdp.xlsx")
+pyr0 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr0.xlsx")
+pyr1 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr1.xlsx")
+pyr2 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr2.xlsx")
+pyr3 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr3.xlsx")
+pyr4 = pd.read_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr4.xlsx")
 
-rbs = [alpha0p2["r_b"], alpha1["r_b"], alpha5["r_b"], alphaadp["r_b"]]
-labels = ["0.2", "1", "5", "Adp"]
-plt.boxplot(rbs, labels=labels)
-plt.xlabel("alpha")
-plt.ylabel("Brightness Constancy Error")
+errs = [pyr0["LK_err"], pyr1["LK_err"], pyr2["LK_err"], pyr3["LK_err"], pyr4["LK_err"]]
+labels = ["0", "1", "2", "3", "4"]
+plt.boxplot(errs, labels=labels)
+plt.xlabel("Pyramid Levels")
+plt.ylabel("LK L1 Error")
 plt.show()
 
-props = [alpha0p2["prop"].dropna(), alpha1["prop"].dropna(), alpha5["prop"].dropna(), alphaadp["prop"].dropna()]
-labels = ["0.2", "1", "5", "Adp"]
+def filter_out_Kilauea(df):
+    print(len(df))
+    df = df[~df["f1_name"].str.contains("Kilauea")]
+    print(len(df))
+    return df
+
+pyr0 = filter_out_Kilauea(pyr0)
+pyr1 = filter_out_Kilauea(pyr1)
+pyr2 = filter_out_Kilauea(pyr2)
+pyr3 = filter_out_Kilauea(pyr3)
+pyr4 = filter_out_Kilauea(pyr4)
+props = [pyr0["prop"].dropna(), pyr1["prop"].dropna(), pyr2["prop"].dropna(), pyr3["prop"].dropna(), pyr4["prop"].dropna()]
+labels = ["0", "1", "2", "3", "4"]
 plt.boxplot(props, tick_labels=labels)
-plt.xlabel("alpha")
+plt.xlabel("Pyramid Level")
 plt.ylabel("Prop Plume Mvmt ID'd")
+plt.show()
+
+lens = [pyr0["mean_mag"].dropna(), pyr1["mean_mag"].dropna(), pyr2["mean_mag"].dropna(), pyr3["mean_mag"].dropna(), pyr4["mean_mag"].dropna()]
+labels = ["0", "1", "2", "3", "4"]
+plt.boxplot(lens, tick_labels=labels)
+plt.xlabel("Pyramid Level")
+plt.ylabel("Mean Velo Vector Magnitude")
 plt.show()
 
 

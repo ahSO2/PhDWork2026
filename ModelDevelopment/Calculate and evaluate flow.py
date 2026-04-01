@@ -179,15 +179,17 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha_rb=0.1, alpha_rc=5, epsilon=1, 
                     #plt.plot(x_axis, residuals_c, label="SmoothnessTerm")
                     #plt.legend()
                     #plt.show()
-                    #plot_dense_flow(flow, i1, n=10)
+                    plot_dense_flow(flow, i1, n=5)
 
     return flow, residuals_b[-1]
 
-def calculate_optical_flow_pair_LK(i1, i2, n=1, plot=False):
+def calculate_optical_flow_pair_LK(i1, i2, n=1, plot=False, max_level=0, ev_filtering=False, min_eig_threshold=None):
     # Flow is indexed as (x, y, 0 for u=dx/dt or 1 for v=dy/dt)
     # X is the horixzontal direction, y the vertical
     #i1 = i1[200:,:]
     #i2 = i2[200:,:]
+    #show(i1)
+    #show(i2)
 
     # Need array of x-coords, y-coords, then dx and dy
     # Downsample to calculate and plot for every n-th coord point
@@ -205,9 +207,11 @@ def calculate_optical_flow_pair_LK(i1, i2, n=1, plot=False):
             points_to_track[counter,0,1] = y
             counter += 1
 
-    #updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track, nextPts=None, minEigThreshold=0.0003, flags=cv2.OPTFLOW_LK_GET_MIN_EIGENVALS)
-    updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track,
-                                                             nextPts=None, maxLevel=0)
+    if ev_filtering == True:
+        updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track, nextPts=None, maxLevel=max_level, flags=cv2.OPTFLOW_LK_GET_MIN_EIGENVALS, minEigThreshold=min_eig_threshold)
+    else:
+        updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track,
+                                                             nextPts=None, maxLevel=max_level)
     status = np.reshape(status[:, 0], (y_pixels.shape[0], x_pixels.shape[0]))
     show(status)
     error = np.reshape(error[:, 0], (y_pixels.shape[0], x_pixels.shape[0]))
@@ -236,7 +240,7 @@ def calculate_optical_flow_pair_LK(i1, i2, n=1, plot=False):
         #axs.imshow(i1, cmap="gray")
         #plt.show()
 
-    return flow
+    return flow, np.sum(error)
 
 
 ######################### Flux calculation functions:
@@ -493,12 +497,13 @@ def closest_dist_w_fixed_point(X, Y, fixed_point):
     return np.min(ds, axis=2)
 
 def calculate_flux_2D(frame1, flow, circle_center, circle_radius, flank_mask):
-    #arc_lengths = calculate_intersection_lengths(frame1, circle_center, circle_radius)
+    arc_lengths = calculate_intersection_lengths(frame1, circle_center, circle_radius)
     #circle_boundary = np.where(arc_lengths>0, 1, 0) #Array of points of intersection of the
     #circle. Want to use this as the boundary.
 
-    #plt.imshow(circle_boundary)
-    #plt.show()
+    plt.imshow(arc_lengths)
+    plt.colorbar()
+    plt.show()
 
     x_coords = np.linspace(0, frame1.shape[1] - 1, frame1.shape[1])
     y_coords = np.linspace(0, frame1.shape[0] - 1, frame1.shape[0])
@@ -570,6 +575,7 @@ def vector_direction(h, v):
 flow_directions = np.vectorize(vector_direction)
 
 
+
 def movement_eval(image, plume_mask, flow, threshold=1):
     '''Does the area that is counted as moving by the flow contain the whole plume
     that I have annotated?'''
@@ -583,11 +589,13 @@ def movement_eval(image, plume_mask, flow, threshold=1):
     #right = axs[1].imshow(flow_direction, cmap="cool")
     #fig.colorbar(left, ax=axs[0], shrink=0.5)
     #fig.colorbar(right, ax=axs[1], shrink=0.5)
+    #plt.title("Flow direction")
     #plt.show()
 
     #plot_dense_flow(flow, flow_direction, 10)
 
     #plt.imshow(flow_mag)
+    #plt.title("Flow magnitude")
     #plt.colorbar()
     #plt.show()
 
@@ -608,9 +616,48 @@ def movement_eval(image, plume_mask, flow, threshold=1):
     else:
         correct_prop = np.nan
 
-    return correct_prop
+    return correct_prop, np.mean(flow_mag)
 
+def check_source_dest_equal(f1, f2, flow):
+    '''For each pixel in frame1, calculate the difference between
+    its value and the pixel value at the location it is mapped to.
+    If it is mapped outwith f2, then ignore this pixel.
 
+    This is intended as a rough check, which in some cases would
+    flag if post-processing of a flow field is making the mappings
+    worse.'''
+
+    x_pixels = np.arange(0, f1.shape[1])
+    y_pixels = np.arange(0, f2.shape[0])
+    X_start, Y_start = np.meshgrid(x_pixels, y_pixels)
+
+    X_dests = X_start + flow[:,:,0]
+    Y_dests = Y_start + flow[:,:,1]
+
+    #Round to the nearest integer pixel value:
+    X_dests = np.round(X_dests, 0).astype(np.uint8)
+    Y_dests = np.round(Y_dests, 0).astype(np.uint8)
+
+    #Want to create a mask to exclude pixels which are mapped
+    #outwith the image: Let array equal one for pixels to ignore
+    exclude = np.zeros_like(X_start)
+    exclude = np.where(X_dests<0, 1, exclude)
+    exclude = np.where(Y_dests<0, 1, exclude)
+    exclude = np.where(X_dests>f1.shape[1]-1, 1, exclude)
+    exclude = np.where(Y_dests>f1.shape[0]-1, 1, exclude)
+    def select_pixel_value(x, y):
+        return f2[y, x]
+    select_values_vectorised = np.vectorize(select_pixel_value)
+
+    #Replacing invaid destinations so we don't break the pixel selection function
+    X_dests = np.where(exclude==0, X_dests, 0)
+    Y_dests = np.where(exclude==0, Y_dests, 0)
+
+    destination_values = select_values_vectorised(X_dests, Y_dests)
+    diff = np.abs(f1 - destination_values)
+    show(diff)
+    valid_diff_values = np.ma.masked_where(exclude==1, diff)
+    return np.ma.sum(valid_diff_values)
 
 
 
@@ -626,13 +673,13 @@ def movement_eval(image, plume_mask, flow, threshold=1):
 
 ######################### Run the code:
 
-results_df = pd.DataFrame(columns=["f1_name", "r_b", "prop"])
+results_df = pd.DataFrame(columns=["f1_name", "bc_err"])
 
 #For each sample:
 df.reset_index(inplace=True)
-print(df.shape[0])
+#print(df.shape[0])
 for index in range(0, df.shape[0], mod):
-    print(index)
+    #print(index)
     #Create a sequence of timestep images
     sequence = []
     names = []
@@ -656,22 +703,24 @@ for index in range(0, df.shape[0], mod):
             all_plume_mask = two_channel_mask[0,:,:] + two_channel_mask[1,:,:]
 
 
-
-
-
-
-
-
     #TODO Conversion to UINT8 may affect optimisation or other calculations
     sequence = convert_sequence_to_UINT8(sequence)
     #sequence = add_gauss_noise(sequence)
 
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
-    flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=0.1, alpha_rc=5, epsilon=0, max_iterations=100, plot=True)
+    #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=0.1, alpha_rc=5, epsilon=0, max_iterations=100, plot=True)
     #TODO am I actually using the epsilon param?
     #TODO check over computation of solution, have I implemented correctly?
-    #flow = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True)
+    flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True, max_level=0, ev_filtering=False, min_eig_threshold=0.0005)
+
+    mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
+    print(mapping_err)
+
+    #Post-processing of flow:
+    #flow[:,:,0] = ndimage.median_filter(flow[:,:,0], size=40)
+    #flow[:,:,1] = ndimage.median_filter(flow[:,:,1], size=40)
+    #plot_dense_flow(flow, sequence[0], n=5)
 
     #Define the integration boundary
     #dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
@@ -684,13 +733,14 @@ for index in range(0, df.shape[0], mod):
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
 
-    prop = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
-    results_df.loc[len(results_df)] = [names[0], rb, prop]
+    #prop, mean_mag = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
 
-results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/12 - Varying Alpha in HnS/AlphaAdp.xlsx")
+    #Error in assumption of global mass conservation
+    #bc_err = (np.sum(sequence[1].astype(np.float64)) - np.sum(sequence[0].astype(np.float64))) / (sequence[0].shape[0] * sequence[0].shape[1])
 
+    #results_df.loc[len(results_df)] = [names[0], bc_err]
 
-
+#results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/14 - Brightness Constancy Eval/ResultsGoodTrainSetSamples.xlsx")
 
 #Calculate the interpolation error
 

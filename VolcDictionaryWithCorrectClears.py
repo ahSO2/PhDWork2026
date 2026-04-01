@@ -159,7 +159,7 @@ Lascar_NineteenthAug_dictionary = {'volcano_dictionary_name':"LascarNineteenthAu
                      "integration_radius": 170}
 
 
-Lascar_View1_dictionary = {'volcano_dictionary_name':"Lascar",
+Lascar_View1_dictionary = {'volcano_dictionary_name':"LascarView1",
                      'volcano_name':"Lascar",
                      'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/SpecificApplicationScripts/ImageQualityClassificationAfterCR/RainAndAsh/CalcAreaMasks/LascarCalcAreaOutlineMask.png",
                      'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/LascarCalcAreaMask.png",
