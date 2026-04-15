@@ -16,8 +16,8 @@ data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 mod = 1
-#timesteps = ["image_name", "next_tensec_name"]
-timesteps = ["image_name", "image_name_B"]
+timesteps = ["image_name", "next_tensec_name"]
+#timesteps = ["image_name", "image_name_B"]
 df = pd.read_excel(samples_sheet)
 df = df[df["overall_obs"]=="No"]
 
@@ -120,6 +120,10 @@ def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow=None, plot_densit
 def calculate_optical_flow_pair_HS(i1, i2, alpha_rb=0.1, alpha_rc=5, epsilon=1, max_iterations=100, initial_flow=None, plot=False):
     #Flow is indexed as (x, y, 0 for u=dI/dx or 1 for v=dI/dy)
     #X is the horixzontal direction, y the vertical
+    '''Alpha rb and rc give the weightings of the BC and Smoothness error terms to be used when
+    optimising (first optimise using alpha r_b, then when r_b stops improving use alpha r_c until
+    the max iter is hit, or r_c stops improving. If these values are equal, we only optimise until
+    r_b stops improving.'''
 
     residuals_b = []
     residuals_c = []
@@ -197,6 +201,13 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha_rb=0.1, alpha_rc=5, epsilon=1, 
             if residuals_b[-1] > 0.999 * residuals_b[-2] or (iter == max_iterations):
                 #show(rb)
                 optimise_rb = False
+                if alpha_rb == alpha_rc:
+                    optimise_rc = False
+                    #x_axis = np.arange(iter)
+                    #plt.plot(x_axis, residuals_b, label="BCTerm")
+                    #plt.plot(x_axis, residuals_c, label="SmoothnessTerm")
+                    #plt.legend()
+                    #plt.show()
             if optimise_rb == False:
                 if residuals_c[-1] > 0.99 * residuals_c[-2] or (iter == max_iterations):
                     optimise_rc = False
@@ -205,7 +216,7 @@ def calculate_optical_flow_pair_HS(i1, i2, alpha_rb=0.1, alpha_rc=5, epsilon=1, 
                     #plt.plot(x_axis, residuals_c, label="SmoothnessTerm")
                     #plt.legend()
                     #plt.show()
-                    plot_dense_flow(flow, i1, n=5)
+                    #plot_dense_flow(flow, i1, n=5)
 
     return flow, residuals_b[-1]
 
@@ -239,9 +250,9 @@ def calculate_optical_flow_pair_LK(i1, i2, n=1, plot=False, max_level=0, ev_filt
         updated_points, status, error = cv2.calcOpticalFlowPyrLK(prevImg=i1, nextImg=i2, prevPts=points_to_track,
                                                              nextPts=None, maxLevel=max_level)
     status = np.reshape(status[:, 0], (y_pixels.shape[0], x_pixels.shape[0]))
-    show(status)
+    #show(status)
     error = np.reshape(error[:, 0], (y_pixels.shape[0], x_pixels.shape[0]))
-    show(error)
+    #show(error)
     print("Calculated flow!")
 
     start_x_coords = points_to_track[:, :, 0]
@@ -704,18 +715,9 @@ def check_bg_ratio(iA, iB, plume_mask, flank_mask):
     return np.ma.std(ratio[100:-50,50:-50])
 
 
-
-
-
-
-
-
-
-
-
 ######################### Run the code:
 
-results_df = pd.DataFrame(columns=["bandA_name", "bg_ratio_std"])
+results_df = pd.DataFrame(columns=["f1_name", "LK_err", "prop", "mean_mag"])
 
 #For each sample:
 df.reset_index(inplace=True)
@@ -743,6 +745,8 @@ for index in range(0, df.shape[0], mod):
             print("Reading plume mask from: " + mask_path)
             two_channel_mask = np.load(mask_path) #Manually drawn plume mask (value 1 indicates plume)
             all_plume_mask = two_channel_mask[0,:,:] + two_channel_mask[1,:,:]
+            all_plume_mask = np.where(all_plume_mask > 0, 1, 0)
+            #show(all_plume_mask)
 
 
     #TODO Conversion to UINT8 may affect optimisation or other calculations
@@ -760,10 +764,10 @@ for index in range(0, df.shape[0], mod):
 
     #Calculate the FB optical flow with standard parameters
     #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=20, pyramid_levels=4)
-    #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=0.1, alpha_rc=5, epsilon=0, max_iterations=100, plot=True)
+    #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=5, alpha_rc=5, epsilon=0, max_iterations=100, plot=False)
     #TODO am I actually using the epsilon param?
     #TODO check over computation of solution, have I implemented correctly?
-    #flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True, max_level=0, ev_filtering=False, min_eig_threshold=0.0005)
+    flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, ev_filtering=False, min_eig_threshold=0)
 
     #mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
     #print(mapping_err)
@@ -777,19 +781,19 @@ for index in range(0, df.shape[0], mod):
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
 
-    #prop, mean_mag = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
+    prop, mean_mag = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
 
     #Error in assumption of global mass conservation
     #bc_err = (np.sum(sequence[1].astype(np.float64)) - np.sum(sequence[0].astype(np.float64))) / (sequence[0].shape[0] * sequence[0].shape[1])
 
     #Evaluating if ratio of background pixels is constant:
     #show(sequence[0])
-    if "Kilauea_2022" in names[0]:
-        std = check_bg_ratio(sequence[0], sequence[1], all_plume_mask, flank_mask)
+    #if "Kilauea_2022" in names[0]:
+    #std = check_bg_ratio(sequence[0], sequence[1], all_plume_mask, flank_mask)
 
-    #results_df.loc[len(results_df)] = [names[0], std]
+    results_df.loc[len(results_df)] = [names[0], err, prop, mean_mag]
 
-#results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/17 - BG Ratio Constancy/CalculatedBgRatios.xlsx")
+results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr4.xlsx")
 
 #Calculate the interpolation error
 

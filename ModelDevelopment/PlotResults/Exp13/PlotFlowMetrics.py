@@ -20,11 +20,11 @@ def filter_out_Kilauea(df):
     print(len(df))
     return df
 
-pyr0 = filter_out_Kilauea(pyr0)
-pyr1 = filter_out_Kilauea(pyr1)
-pyr2 = filter_out_Kilauea(pyr2)
-pyr3 = filter_out_Kilauea(pyr3)
-pyr4 = filter_out_Kilauea(pyr4)
+#pyr0 = filter_out_Kilauea(pyr0)
+#pyr1 = filter_out_Kilauea(pyr1)
+#pyr2 = filter_out_Kilauea(pyr2)
+#pyr3 = filter_out_Kilauea(pyr3)
+#pyr4 = filter_out_Kilauea(pyr4)
 props = [pyr0["prop"].dropna(), pyr1["prop"].dropna(), pyr2["prop"].dropna(), pyr3["prop"].dropna(), pyr4["prop"].dropna()]
 labels = ["0", "1", "2", "3", "4"]
 plt.boxplot(props, tick_labels=labels)
