@@ -717,7 +717,7 @@ def check_bg_ratio(iA, iB, plume_mask, flank_mask):
 
 ######################### Run the code:
 
-results_df = pd.DataFrame(columns=["f1_name", "LK_err", "prop", "mean_mag"])
+results_df = pd.DataFrame(columns=["f1_name", "prop", "mean_mag"])
 
 #For each sample:
 df.reset_index(inplace=True)
@@ -760,14 +760,14 @@ for index in range(0, df.shape[0], mod):
 
     #Add noise
     #sequence = add_gauss_noise(sequence, mean="plume", sd=None, int_reg_center=int_circle_center, int_rad=int_circle_radius, flank_mask=flank_mask)
-    #sequence = add_gauss_noise(sequence, mean=0, sd=5)
+    sequence = add_gauss_noise(sequence, mean=0, sd=5)
 
     #Calculate the FB optical flow with standard parameters
-    #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=20, pyramid_levels=4)
+    flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=False, pyramid_levels=4)
     #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=5, alpha_rc=5, epsilon=0, max_iterations=100, plot=False)
     #TODO am I actually using the epsilon param?
     #TODO check over computation of solution, have I implemented correctly?
-    flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, ev_filtering=False, min_eig_threshold=0)
+    #flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, ev_filtering=False, min_eig_threshold=0)
 
     #mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
     #print(mapping_err)
@@ -791,9 +791,9 @@ for index in range(0, df.shape[0], mod):
     #if "Kilauea_2022" in names[0]:
     #std = check_bg_ratio(sequence[0], sequence[1], all_plume_mask, flank_mask)
 
-    results_df.loc[len(results_df)] = [names[0], err, prop, mean_mag]
+    results_df.loc[len(results_df)] = [names[0], prop, mean_mag]
 
-results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/13 - Basic LK Movement Est/BasicLK_Pyr4.xlsx")
+results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/16 - FB Gauss Noise/M0SD5_OnGoodTrainSetSamples.xlsx")
 
 #Calculate the interpolation error
 
