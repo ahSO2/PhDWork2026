@@ -16,14 +16,15 @@ data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 mod = 1
-timesteps = ["image_name", "next_tensec_name"]
-
+#timesteps = ["image_name", "next_tensec_name"]
+timesteps = ["image_name", "image_name_B"]
 df = pd.read_excel(samples_sheet)
 df = df[df["overall_obs"]=="No"]
 
 
 def show(image):
     plt.imshow(image, cmap="gray")
+    plt.colorbar()
     plt.show()
 
 def convert_sequence_to_UINT8(sequence):
@@ -33,12 +34,36 @@ def convert_sequence_to_UINT8(sequence):
         converted_sequence.append(converted_image)
     return converted_sequence
 
-def add_gauss_noise(sequence):
+def add_gauss_noise(sequence, mean, sd, int_reg_center=None, int_rad=None, flank_mask=None):
     noisy_sequence = []
+    if mean == "plume":
+        #Select pixels where we expect to find plume (in the integration region)
+        x_coords = np.linspace(0, sequence[0].shape[1] - 1, sequence[0].shape[1])
+        y_coords = np.linspace(0, sequence[0].shape[0] - 1, sequence[0].shape[0])
+        X_start, Y_start = np.meshgrid(x_coords, y_coords)
+
+        start_dists = closest_dist_w_fixed_point(X_start, Y_start, int_reg_center)
+        start_in_circle = np.where(start_dists < int_rad, 1, 0)
+
+        region_to_consider = np.where(flank_mask==1, start_in_circle, 0)
+        #show(region_to_consider)
+
+    else:
+        scale = sd
     for image in sequence:
-        scale = np.max(image)/2
-        noise = np.random.normal(loc=0, scale =5, size=image.shape)
-        noisy_sequence.append(image + noise)
+        if mean == "plume":
+            mean = np.ma.mean(np.ma.masked_where(region_to_consider>0, image))
+            d1 = np.abs(np.max(image) - mean)
+            d2 = np.abs(np.min(image) - mean)
+            scale = min(d1, d2)/2
+
+        noise = np.random.normal(loc=mean, scale =scale, size=image.shape)
+        noisy = image.astype(np.float32) + noise
+        noisy = np.where(noisy<0, 0, noisy)
+        noisy = np.where(noisy>255, 255, noisy)
+        noisy_sequence.append(np.round(noisy, 0).astype(np.uint8))
+        #noisy_sequence.append(noise.astype(np.uint8))
+        #show(np.round(noisy, 0).astype(np.uint8))
     return noisy_sequence
 
 def plot_dense_flow(flow, image, n, color_array=None):
@@ -66,19 +91,20 @@ def plot_dense_flow(flow, image, n, color_array=None):
     plt.show()
     # plt.close()
 
-def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow=None, plot=False, n=5):
-    flow = cv2.calcOpticalFlowFarneback(prev=i1, next=i2, flow =initial_flow, pyr_scale=0.5, levels=4, winsize=20, iterations=5, poly_n=7, poly_sigma=1.5, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
+def calculate_optical_flow_pair_Farneback(i1, i2, initial_flow=None, plot_density=False, pyramid_levels=1, n_iter=5, window_size=20, poly_n=7, poly_s=1.5):
+    #TODO Note I don't have the "use initial flow" flag set here
+    flow = cv2.calcOpticalFlowFarneback(prev=i1, next=i2, flow =initial_flow, pyr_scale=0.5, levels=pyramid_levels, winsize=window_size, iterations=n_iter, poly_n=poly_n, poly_sigma=poly_s, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
 
-    if plot==True:
+    if plot_density!=False:
         # Need array of x-coords, y-coords, then dx and dy
         # Downsample to plot every n-th coord point
-        x_pixels = np.arange(0, i1.shape[1], n)
-        y_pixels = np.arange(0, i1.shape[0], n)
+        x_pixels = np.arange(0, i1.shape[1], plot_density)
+        y_pixels = np.arange(0, i1.shape[0], plot_density)
         X, Y = np.meshgrid(x_pixels, y_pixels)
 
         # Downsample every nth flow vector for plotting
-        flow_dx = flow[0::n, 0::n, 0]
-        flow_dy = flow[0::n, 0::n, 1]
+        flow_dx = flow[0::plot_density, 0::plot_density, 0]
+        flow_dy = flow[0::plot_density, 0::plot_density, 1]
 
         plt.quiver(X, Y, flow_dx, flow_dy, color='g', scale_units='xy', scale=1, angles='xy')
         plt.gca().invert_yaxis()
@@ -659,7 +685,23 @@ def check_source_dest_equal(f1, f2, flow):
     valid_diff_values = np.ma.masked_where(exclude==1, diff)
     return np.ma.sum(valid_diff_values)
 
+def check_bg_ratio(iA, iB, plume_mask, flank_mask):
+    masked_A = np.ma.masked_where(plume_mask>=1, iA)
+    masked_B = np.ma.masked_where(np.logical_or(iB==0, flank_mask==0), iB)
+    ratio = np.ma.divide(masked_A.astype("float32"), masked_B.astype("float32"))
+    #Mask out areas where bandB is zero, and where the plume is
+    #iB = np.where(flank_mask==0, 0, iB)
+    #ratio = np.ma.masked_where(np.logical_or(iB==0, plume_mask>=1), ratio)
+    #show(plume_mask)
 
+    plt.imshow(ratio[100:-50,50:-50])
+    plt.colorbar()
+    plt.show()
+
+    #plt.boxplot(ratio[100:-50,50:-50].compressed())
+    #plt.show()
+
+    return np.ma.std(ratio[100:-50,50:-50])
 
 
 
@@ -673,7 +715,7 @@ def check_source_dest_equal(f1, f2, flow):
 
 ######################### Run the code:
 
-results_df = pd.DataFrame(columns=["f1_name", "bc_err"])
+results_df = pd.DataFrame(columns=["bandA_name", "bg_ratio_std"])
 
 #For each sample:
 df.reset_index(inplace=True)
@@ -705,42 +747,49 @@ for index in range(0, df.shape[0], mod):
 
     #TODO Conversion to UINT8 may affect optimisation or other calculations
     sequence = convert_sequence_to_UINT8(sequence)
-    #sequence = add_gauss_noise(sequence)
+
+    # Define the integration boundary
+    dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
+    int_circle_center = dictionary["integration_region_center"]
+    int_circle_radius = dictionary["integration_radius"]
+    flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
+
+    #Add noise
+    #sequence = add_gauss_noise(sequence, mean="plume", sd=None, int_reg_center=int_circle_center, int_rad=int_circle_radius, flank_mask=flank_mask)
+    #sequence = add_gauss_noise(sequence, mean=0, sd=5)
 
     #Calculate the FB optical flow with standard parameters
-    #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot=True)
+    #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=20, pyramid_levels=4)
     #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=0.1, alpha_rc=5, epsilon=0, max_iterations=100, plot=True)
     #TODO am I actually using the epsilon param?
     #TODO check over computation of solution, have I implemented correctly?
-    flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True, max_level=0, ev_filtering=False, min_eig_threshold=0.0005)
+    #flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True, max_level=0, ev_filtering=False, min_eig_threshold=0.0005)
 
-    mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
-    print(mapping_err)
+    #mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
+    #print(mapping_err)
 
     #Post-processing of flow:
     #flow[:,:,0] = ndimage.median_filter(flow[:,:,0], size=40)
     #flow[:,:,1] = ndimage.median_filter(flow[:,:,1], size=40)
     #plot_dense_flow(flow, sequence[0], n=5)
 
-    #Define the integration boundary
-    #dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
-    #int_circle_center = dictionary["integration_region_center"]
-    #int_circle_radius = dictionary["integration_radius"]
-    #flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
-
 
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
-
 
     #prop, mean_mag = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
 
     #Error in assumption of global mass conservation
     #bc_err = (np.sum(sequence[1].astype(np.float64)) - np.sum(sequence[0].astype(np.float64))) / (sequence[0].shape[0] * sequence[0].shape[1])
 
-    #results_df.loc[len(results_df)] = [names[0], bc_err]
+    #Evaluating if ratio of background pixels is constant:
+    #show(sequence[0])
+    if "Kilauea_2022" in names[0]:
+        std = check_bg_ratio(sequence[0], sequence[1], all_plume_mask, flank_mask)
 
-#results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/14 - Brightness Constancy Eval/ResultsGoodTrainSetSamples.xlsx")
+    #results_df.loc[len(results_df)] = [names[0], std]
+
+#results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/17 - BG Ratio Constancy/CalculatedBgRatios.xlsx")
 
 #Calculate the interpolation error
 
