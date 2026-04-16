@@ -759,8 +759,31 @@ def calc_pixel_geometry():
     #displacement vector
     cam_to_volc = vent - cam
     cam_to_volc.set_anchor(cam)
-    distance = cam_to_volc.dist_hor
-    print(cam_to_volc)
+    distance = cam_to_volc.dist_hor #distance in km
+
+    cfov_elev = 26 #in degrees, elevation angle for cam CFOV #TODO ideally would be calulated
+
+    #TODO for each pixel, calculate corresponding angle
+    #Assume that the number of pixels is divisible by 2
+    v, h = 486, 648
+    alpha = 21 / v #fraction of vertical FOV angle for each pixel
+    multipliers_1D = np.flip(np.concatenate([np.arange(-1 * v/2, 0, 1), np.arange(1, v/2+1, 1)]))
+    multipliers_2D = np.stack([multipliers_1D] * h, axis=1) - np.ones((v, h)) * 0.5
+    pixel_center_angles = alpha * multipliers_2D + np.ones_like(multipliers_2D) * cfov_elev
+    show(pixel_center_angles)
+
+    #TODO then caculate the pixel center height
+    pixel_center_heights = np.tan(pixel_center_angles) * distance
+    pixel_size_v = 
+
+    #TODO can we assume the pixels are square?
+    #TODO this method is different to that used in pyplis, double ckeck it makes sense
+
+
+
+
+
+
 
 
 ######################### Run the code:
