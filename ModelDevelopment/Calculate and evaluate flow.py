@@ -2,6 +2,7 @@
 #then evaluate.
 
 import cv2
+from datetime import datetime
 from geonum import GeoPoint, GeoVector3D, GeoSetup, BASEMAP_AVAILABLE
 import matplotlib.pyplot as plt
 import numpy as np
@@ -825,6 +826,41 @@ def calc_pixel_geometry(dictionary):
 
     return geom_to_return
 
+def map_image_name_to_time(name):
+    date_str = name.split("_")[1][0:10]
+    time_str = name.split("_")[1][11:17]
+    datetime_obj = datetime(int(date_str[0:4]), int(date_str[5:7]), int(date_str[8:10]), int(time_str[:2]),
+                            int(time_str[2:4]), int(time_str[4:]))
+    return datetime_obj
+
+def get_timestep_lengths(names):
+    #For each image in the sequence, other than the last,
+    #calculate the time till the next image
+    timestep_lens = []
+    for index in range(0, len(names) - 1):
+        this_ts = map_image_name_to_time(names[index])
+        next_ts = map_image_name_to_time(names[index+1])
+        ts_len = next_ts - this_ts
+        timestep_lens.append(ts_len.total_seconds())
+    return timestep_lens
+
+def scale_flow_to_meters(flow, pixel_geom):
+    x = np.arange(0, flow.shape[1])
+    y = np.arange(0, flow.shape[0])
+    X_start, Y_start = np.meshgrid(x, y)
+
+    X_dests = X_start + flow[:, :, 0]
+    Y_dests = Y_start + flow[:, :, 1]
+
+    #TODO Need to extract the true pixel center coordinates
+    #given the start and destination pixel indexes for each flow vector
+    #TODO See integer array indexing: https://numpy.org/doc/stable/user/basics.indexing.html
+
+
+
+    #TODO then calcuate the x and y displacement in meters
+    #TODO and return this as the scaled flow
+
 
 
 
@@ -876,6 +912,7 @@ for index in range(0, df.shape[0], mod):
     int_circle_radius = dictionary["integration_radius"]
     flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
     pixel_geom = calc_pixel_geometry(dictionary)
+    timestep_lens = get_timestep_lengths(names)
 
     #Add noise
     #sequence, noise = add_gauss_noise(sequence, mean="plume", sd=None, int_reg_center=int_circle_center, int_rad=int_circle_radius, flank_mask=flank_mask)
@@ -896,9 +933,13 @@ for index in range(0, df.shape[0], mod):
     #flow[:,:,1] = ndimage.median_filter(flow[:,:,1], size=40)
     #plot_dense_flow(flow, sequence[0], n=5)
 
+    #Scale flow to m/s
+    #Scale the displacement to be in meters
+    flow = scale_flow()
+    #Divide by timestep length
+
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
     #calculate_flux_2D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
-
 
     #prop, mean_mag, masked_mean = movement_eval(sequence[0], all_plume_mask, flow, threshold=0.25)
     #result, perc_95 = movement_eval_considering_noise(noise_flow, flow, all_plume_mask)
