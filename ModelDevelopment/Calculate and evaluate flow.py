@@ -759,25 +759,45 @@ def calc_pixel_geometry():
     #displacement vector
     cam_to_volc = vent - cam
     cam_to_volc.set_anchor(cam)
-    distance = cam_to_volc.dist_hor #distance in km
+    dist_h = cam_to_volc.dist_hor #distance in km
 
     cfov_elev = 26 #in degrees, elevation angle for cam CFOV #TODO ideally would be calulated
 
-    #TODO for each pixel, calculate corresponding angle
+    #For each pixel, calulate the elevation angle of the top
     #Assume that the number of pixels is divisible by 2
     v, h = 486, 648
+    #TODO Assume angle of each pixel in v and h directions are equal
     alpha = 21 / v #fraction of vertical FOV angle for each pixel
-    multipliers_1D = np.flip(np.concatenate([np.arange(-1 * v/2, 0, 1), np.arange(1, v/2+1, 1)]))
-    multipliers_2D = np.stack([multipliers_1D] * h, axis=1) - np.ones((v, h)) * 0.5
-    pixel_center_angles = alpha * multipliers_2D + np.ones_like(multipliers_2D) * cfov_elev
-    show(pixel_center_angles)
+    multipliers_1D = np.arange(v/2, -v/2, -1)
+    multipliers_2D = np.stack([multipliers_1D] * h, axis=1)
+    pixel_top_angles = alpha * multipliers_2D + np.ones_like(multipliers_2D) * cfov_elev
+    #show(pixel_top_angles)
 
-    #TODO then caculate the pixel center height
-    pixel_center_heights = np.tan(pixel_center_angles) * distance
-    pixel_size_v = 
+    #Then caculate the height of the top of each pixel
+    pixel_top_heights = np.tan(np.deg2rad(pixel_top_angles)).astype(np.float64) * dist_h
+    #show(np.tan(np.deg2rad(pixel_top_angles)))
+    pixel_size_v = pixel_top_heights[:-1,:] - pixel_top_heights[1:,:]
+    #show(pixel_size_v)
 
-    #TODO can we assume the pixels are square?
+    #For each row, find the distance travelled by the cfov line, in the direction of the elevation angle
+    pixel_center_angles = pixel_top_angles - np.ones_like(pixel_top_angles) * alpha * 0.5
+    l = np.divide(np.ones_like(pixel_center_angles) * dist_h, np.cos(np.deg2rad(pixel_center_angles)))
+    #show(l)
+    angle_range = np.concatenate([np.flip(np.arange(1, h/2 + 1, 1)), np.arange(1, h/2 + 1, 1)])
+    angles_h = np.stack([angle_range] * v, axis=0) * alpha
+    #show(angles_h)
+    pixel_edges_h = np.multiply(l, np.tan(np.deg2rad(angles_h)))
+    to_subtract = np.insert(pixel_edges_h[:,1:-1], int(h/2) - 1, [[0], [0]], axis=1)
+    show(to_subtract)
+    pixel_sizes_h = pixel_edges_h.astype(np.float32) - to_subtract.astype(np.float32)
+    show(pixel_sizes_h)
+
+    pixel_area = np.multiply(pixel_size_v, pixel_sizes_h[0:-1, :])
+    show(pixel_area)
+
+
     #TODO this method is different to that used in pyplis, double ckeck it makes sense
+    return pixel_size_v
 
 
 
