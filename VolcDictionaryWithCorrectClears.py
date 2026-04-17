@@ -16,7 +16,13 @@ Cotopaxi_View2_dictionary = {'volcano_dictionary_name':"CotopaxiView2",
                              "shared_drive_folder_path":"X:/volcano_cameras/Shared/Cotopaxi/",
                              "shared_drive_has_year_subfolders":"yes",
                              "integration_region_center": (466, 306),
-                             "integration_radius": 100}
+                             "integration_radius": 100,
+                           "cfov_elev": 20,
+                           "cam_lat": -0.642243,
+                           "cam_lon": -78.402786,
+                           "volc_lat": -0.683753,
+                           "volc_lon": -78.437091
+                           }
 
 Cotopaxi_View3_dictionary = {'volcano_dictionary_name':"CotopaxiView3",
                              'volcano_name':"Cotopaxi",
@@ -36,7 +42,13 @@ Cotopaxi_View3_dictionary = {'volcano_dictionary_name':"CotopaxiView3",
                              "shared_drive_folder_path":"X:/volcano_cameras/Shared/Cotopaxi/",
                              "shared_drive_has_year_subfolders":"yes",
                               "integration_region_center": (335, 208),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": 20,
+                           "cam_lat": -0.642243,
+                           "cam_lon": -78.402786,
+                           "volc_lat": -0.683753,
+                           "volc_lon": -78.437091
+                           }
 
 Cotopaxi_View4_dictionary = {'volcano_dictionary_name':"CotopaxiView4",
                              'volcano_name':"Cotopaxi",
@@ -56,7 +68,13 @@ Cotopaxi_View4_dictionary = {'volcano_dictionary_name':"CotopaxiView4",
                              "shared_drive_folder_path": "X:/volcano_cameras/Shared/Cotopaxi/",
                              "shared_drive_has_year_subfolders": "yes",
                               "integration_region_center": (265, 292),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": 20,
+                           "cam_lat": -0.642243,
+                           "cam_lon": -78.402786,
+                           "volc_lat": -0.683753,
+                           "volc_lon": -78.437091
+                           }
 
 Kilauea_View1_dictionary = {'volcano_dictionary_name':"KilaueaView1",
                             'volcano_name':'Kilauea',
@@ -76,7 +94,13 @@ Kilauea_View1_dictionary = {'volcano_dictionary_name':"KilaueaView1",
                             "shared_drive_folder_path": "X:/pering_group/Shared/Kilauea/",
                             "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (644,323),
-                              "integration_radius":300}
+                              "integration_radius":300,
+                           "cfov_elev": None,
+                           "cam_lat": 19.37915,
+                           "cam_lon": -155.28081,
+                           "volc_lat": 19.400282,
+                           "volc_lon": -155.294696
+                           }
 
 
 Kilauea_View2_dictionary = {'volcano_dictionary_name':"KilaueaView2",
@@ -97,7 +121,13 @@ Kilauea_View2_dictionary = {'volcano_dictionary_name':"KilaueaView2",
                             "shared_drive_folder_path": "X:/pering_group/Shared/Kilauea/",
                             "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (644,323),
-                              "integration_radius":300}
+                              "integration_radius":300,
+                           "cfov_elev": None,
+                           "cam_lat": 19.37915,
+                           "cam_lon": -155.28081,
+                           "volc_lat": 19.400282,
+                           "volc_lon": -155.294696
+                           }
 
 Reventador_2023_dictionary = {'volcano_dictionary_name':"Reventador2023",
                               'volcano_name':'Reventador',
@@ -117,7 +147,12 @@ Reventador_2023_dictionary = {'volcano_dictionary_name':"Reventador2023",
                               "shared_drive_folder_path": "X:/volcano_cameras/Shared/Reventador/",
                               "shared_drive_has_year_subfolders": "yes",
                               "integration_region_center": (335, 275),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                              "cfov_elev":24,
+                              "cam_lat":-0.073421,
+                              "cam_lon":-77.617984,
+                              "volc_lat":-0.080990,
+                              "volc_lon":-77.658503}
 
 Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               'volcano_name':'Reventador',
@@ -137,26 +172,12 @@ Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               "shared_drive_folder_path": "X:/volcano_cameras/Shared/Reventador/",
                               "shared_drive_has_year_subfolders": "yes",
                               "integration_region_center": (348, 284),
-                              "integration_radius": 100}
-
-Lascar_NineteenthAug_dictionary = {'volcano_dictionary_name':"LascarNineteenthAugust",
-                     'volcano_name':"Lascar",
-                     'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/SpecificApplicationScripts/ImageQualityClassificationAfterCR/RainAndAsh/CalcAreaMasks/LascarCalcAreaOutlineMask.png",
-                     'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/LascarCalcAreaMask.png",
-                     'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/LascarNineteenthAugustFlankMask.png",
-                     'sig_figs_for_dark_ss': 1,
-                     'dark_path_A': "C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lascar_BandA",
-                     'dark_path_B': "C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lascar_BandB",
-                     'clear_sky_path_A':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/CorrectingVignetteCorrForLabelledData/SelectedClears/Lascar/AveragedClearA_DarkCorrected.png",
-                    'clear_sky_path_B':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/CorrectingVignetteCorrForLabelledData/SelectedClears/Lascar/AveragedClearB_DarkCorrected.png",
-                    'registration_points_A':np.float32([[250, 294], [604, 208], [88,425], [551,332]]),
-                     'registration_points_B':np.float32([[235,288], [591,198], [69,424], [538,325]]),
-                     'sensor_marks_mask_A': "Lascar_A.png",
-                     'sensor_marks_mask_B': "None",
-                    "shared_drive_folder_path": "X:/volcano_cameras/Shared/Lascar/",
-                    "shared_drive_has_year_subfolders": "yes",
-                     "integration_region_center": (280, 309),
-                     "integration_radius": 170}
+                              "integration_radius": 100,
+                              "cfov_elev":25,
+                              "cam_lat":-0.09559,
+                              "cam_lon":-77.62871,
+                              "volc_lat":-0.080990,
+                              "volc_lon":-77.658503}
 
 
 Lascar_View1_dictionary = {'volcano_dictionary_name':"LascarView1",
@@ -176,7 +197,37 @@ Lascar_View1_dictionary = {'volcano_dictionary_name':"LascarView1",
                     "shared_drive_folder_path": "X:/volcano_cameras/Shared/Lascar/",
                     "shared_drive_has_year_subfolders": "yes",
                      "integration_region_center": (280, 309),
-                     "integration_radius": 170}
+                     "integration_radius": 170,
+                              "cfov_elev":None,
+                              "cam_lat":-23.398286,
+                              "cam_lon":-67.7203136,
+                              "volc_lat":-23.367376,
+                              "volc_lon":-67.733365}
+
+Lascar_NineteenthAug_dictionary = {'volcano_dictionary_name':"LascarNineteenthAugust",
+                     'volcano_name':"Lascar",
+                     'calc_area_outline_mask_path':"C:/Users/ggp24ash/PycharmProjects/SO2-processing/SpecificApplicationScripts/ImageQualityClassificationAfterCR/RainAndAsh/CalcAreaMasks/LascarCalcAreaOutlineMask.png",
+                     'calc_area_mask_path': "C:/Users/ggp24ash/PycharmProjects/SO2-processing/VolcanoData/CalcRegionOutlineMasks/LascarCalcAreaMask.png",
+                     'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/LascarNineteenthAugustFlankMask.png",
+                     'sig_figs_for_dark_ss': 1,
+                     'dark_path_A': "C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lascar_BandA",
+                     'dark_path_B': "C:/Users/ggp24ash/Documents/VolcanoData/fromSharedDrive/Darks/Lascar_BandB",
+                     'clear_sky_path_A':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/CorrectingVignetteCorrForLabelledData/SelectedClears/Lascar/AveragedClearA_DarkCorrected.png",
+                    'clear_sky_path_B':"C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/CorrectingVignetteCorrForLabelledData/SelectedClears/Lascar/AveragedClearB_DarkCorrected.png",
+                    'registration_points_A':np.float32([[250, 294], [604, 208], [88,425], [551,332]]),
+                     'registration_points_B':np.float32([[235,288], [591,198], [69,424], [538,325]]),
+                     'sensor_marks_mask_A': "Lascar_A.png",
+                     'sensor_marks_mask_B': "None",
+                    "shared_drive_folder_path": "X:/volcano_cameras/Shared/Lascar/",
+                    "shared_drive_has_year_subfolders": "yes",
+                     "integration_region_center": (280, 309),
+                     "integration_radius": 170,
+                              "cfov_elev":None,
+                              "cam_lat":-23.398286,
+                              "cam_lon":-67.7203136,
+                              "volc_lat":-23.367376,
+                              "volc_lon":-67.733365}
+
 
 Lastarria_dictionary = {'volcano_dictionary_name':"Lastarria",
                         'volcano_name':'Lastarria',
@@ -194,7 +245,12 @@ Lastarria_dictionary = {'volcano_dictionary_name':"Lastarria",
                         'sensor_marks_mask_A': "Lastarria_A.png",
                         'sensor_marks_mask_B': "Lastarria_B.png",
                         "shared_drive_folder_path": "X:/pering_group/Shared/Lastarria/",
-                        "shared_drive_has_year_subfolders": "yes"}
+                        "shared_drive_has_year_subfolders": "yes",
+                              "cfov_elev":None,
+                              "cam_lat":-25.124277,
+                              "cam_lon":-68.511168,
+                              "volc_lat":-25.158350,
+                              "volc_lon":-68.511457}
 
 Merapi_View0_dictionary = {'volcano_dictionary_name':"MerapiView0",
                            'volcano_name':'Merapi',
@@ -211,7 +267,13 @@ Merapi_View0_dictionary = {'volcano_dictionary_name':"MerapiView0",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (340, 270),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 Merapi_TenthJune_dictionary = {'volcano_dictionary_name':"MerapiTenthJune",
                            'volcano_name':'Merapi',
@@ -226,8 +288,13 @@ Merapi_TenthJune_dictionary = {'volcano_dictionary_name':"MerapiTenthJune",
                            'sensor_marks_mask_A': "Merapi_5A.png",
                            'sensor_marks_mask_B': "Merapi_3B.png",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
-                           "shared_drive_has_year_subfolders": "no"
-                           }
+                           "shared_drive_has_year_subfolders": "no",
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                            }
 
 Merapi_SixteenthJune_dictionary = {'volcano_dictionary_name':"MerapiSixteenthJune",
                            'volcano_name':'Merapi',
@@ -244,7 +311,13 @@ Merapi_SixteenthJune_dictionary = {'volcano_dictionary_name':"MerapiSixteenthJun
                         "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (310, 265),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 Merapi_SecondOct_dictionary = {'volcano_dictionary_name':"MerapiSecondOct",
                            'volcano_name':'Merapi',
@@ -261,7 +334,13 @@ Merapi_SecondOct_dictionary = {'volcano_dictionary_name':"MerapiSecondOct",
                                "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (264, 254),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 Merapi_View1_dictionary = {'volcano_dictionary_name':"MerapiView1",
                            'volcano_name':'Merapi',
@@ -278,7 +357,13 @@ Merapi_View1_dictionary = {'volcano_dictionary_name':"MerapiView1",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (346, 270),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 Merapi_View3_dictionary = {'volcano_dictionary_name':"MerapiView3",
                            'volcano_name':'Merapi',
@@ -298,7 +383,13 @@ Merapi_View3_dictionary = {'volcano_dictionary_name':"MerapiView3",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                            "integration_region_center": (314, 262),
-                           "integration_radius": 100}
+                           "integration_radius": 100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 Merapi_View4_dictionary = {'volcano_dictionary_name':"MerapiView4",
                            'volcano_name':'Merapi',
@@ -318,7 +409,13 @@ Merapi_View4_dictionary = {'volcano_dictionary_name':"MerapiView4",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                               "integration_region_center": (280, 253),
-                              "integration_radius":100}
+                              "integration_radius":100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 Merapi_View5_dictionary = {'volcano_dictionary_name':"MerapiView5",
                            'volcano_name':'Merapi',
@@ -338,7 +435,13 @@ Merapi_View5_dictionary = {'volcano_dictionary_name':"MerapiView5",
                            "shared_drive_folder_path": "X:/pering_group/Shared/Merapi/",
                            "shared_drive_has_year_subfolders": "no",
                            "integration_region_center": (257, 248),
-                           "integration_radius": 100}
+                           "integration_radius": 100,
+                           "cfov_elev": None,
+                           "cam_lat": -7.497253,
+                           "cam_lon": -110.421567,
+                           "volc_lat": -7.540918,
+                           "volc_lon": -110.445874
+                           }
 
 all_dictionaries = [Cotopaxi_View2_dictionary, Cotopaxi_View3_dictionary, Cotopaxi_View4_dictionary, Kilauea_View1_dictionary, Kilauea_View2_dictionary,
                     Reventador_2023_dictionary, Reventador_2024_dictionary, Lascar_View1_dictionary, Lascar_NineteenthAug_dictionary, Lastarria_dictionary, Merapi_View0_dictionary, Merapi_TenthJune_dictionary,

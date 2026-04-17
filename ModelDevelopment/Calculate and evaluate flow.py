@@ -738,18 +738,30 @@ def check_bg_ratio(iA, iB, plume_mask, flank_mask):
 
     return np.ma.std(ratio[100:-50,50:-50])
 
-def calc_pixel_geometry():
+class PixelGeometry():
+    def __init__(self):
+        pass
+
+    def set_pixel_sizes(self, sizes_v, sizes_h):
+        self.pixel_sizes_v = sizes_v
+        self.pixel_sizes_h = sizes_h
+
+    def set_pixel_centers(self, center_heights, center_hor_offsets):
+        self.pixel_center_heights = center_heights
+        self.pixel_center_horizontal = center_hor_offsets
+
+def calc_pixel_geometry(dictionary):
     '''Based off of the MeasGeometry class in pyplis.
     And geonum example scripts.'''
 
     setup = GeoSetup()
 
     #Initialize camera location
-    cam = GeoPoint( -0.073421,  -77.617984, name="cam",
+    cam = GeoPoint(dictionary["cam_lat"],  dictionary["cam_lon"], name="cam",
                       auto_topo_access=True)
 
     #Initialize vent location
-    vent = GeoPoint(latitude=-0.080990,  longitude=-77.658503, name="vent", auto_topo_access=True)
+    vent = GeoPoint(dictionary["volc_lat"],  dictionary["volc_lon"], name="vent", auto_topo_access=True)
 
     setup.add_geo_points(cam, vent)
     setup.set_borders_from_points()
@@ -761,7 +773,10 @@ def calc_pixel_geometry():
     cam_to_volc.set_anchor(cam)
     dist_h = cam_to_volc.dist_hor #distance in km
 
-    cfov_elev = 26 #in degrees, elevation angle for cam CFOV #TODO ideally would be calulated
+    if dictionary["cfov_elev"] == None:
+        cfov_elev = cam_to_volc.elevation
+    else:
+        cfov_elev = dictionary["cfov_elev"]  #in degrees, elevation angle for cam CFOV #TODO ideally would be calulated
 
     #For each pixel, calulate the elevation angle of the top
     #Assume that the number of pixels is divisible by 2
@@ -788,16 +803,27 @@ def calc_pixel_geometry():
     #show(angles_h)
     pixel_edges_h = np.multiply(l, np.tan(np.deg2rad(angles_h)))
     to_subtract = np.insert(pixel_edges_h[:,1:-1], int(h/2) - 1, [[0], [0]], axis=1)
-    show(to_subtract)
+    #show(to_subtract)
     pixel_sizes_h = pixel_edges_h.astype(np.float32) - to_subtract.astype(np.float32)
-    show(pixel_sizes_h)
+    #show(pixel_sizes_h)
 
-    pixel_area = np.multiply(pixel_size_v, pixel_sizes_h[0:-1, :])
+    pixel_area = np.multiply(pixel_size_v * 1000, pixel_sizes_h[0:-1, :] * 1000) #In m^2
     show(pixel_area)
 
-
+    #Calculate also the
+    pixel_center_heights = np.tan(np.deg2rad(pixel_center_angles)).astype(np.float64) * dist_h
+    #show(pixel_center_heights)
+    pixel_center_hor_angles_rhs = angles_h[:,int(h/2):] - np.ones((v, int(h/2))) * alpha/2
+    pixel_center_hor_disp_rhs = l[:, int(h/2):] * np.tan(np.deg2rad(pixel_center_hor_angles_rhs))
+    pixel_center_hor_disp = np.concatenate([np.flip(pixel_center_hor_disp_rhs), pixel_center_hor_disp_rhs], axis=1)
+    #show(pixel_center_hor_disp)
     #TODO this method is different to that used in pyplis, double ckeck it makes sense
-    return pixel_size_v
+
+    geom_to_return = PixelGeometry()
+    geom_to_return.set_pixel_sizes(pixel_size_v, pixel_sizes_h)
+    geom_to_return.set_pixel_centers(pixel_center_heights, pixel_center_hor_disp)
+
+    return geom_to_return
 
 
 
@@ -832,8 +858,9 @@ for index in range(0, df.shape[0], mod):
         sequence.append(timestep_image)
         names.append(name_to_read)
         if timestep_name == "image_name":
+            print(name_to_read)
             mask_path = segmentation_masks_path + batch + "/PlumeAndExpPixels_" + name_to_read.split(".")[0] + ".npy"
-            print("Reading plume mask from: " + mask_path)
+            #print("Reading plume mask from: " + mask_path)
             two_channel_mask = np.load(mask_path) #Manually drawn plume mask (value 1 indicates plume)
             all_plume_mask = two_channel_mask[0,:,:] + two_channel_mask[1,:,:]
             all_plume_mask = np.where(all_plume_mask > 0, 1, 0)
@@ -848,6 +875,7 @@ for index in range(0, df.shape[0], mod):
     int_circle_center = dictionary["integration_region_center"]
     int_circle_radius = dictionary["integration_radius"]
     flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
+    pixel_geom = calc_pixel_geometry(dictionary)
 
     #Add noise
     #sequence, noise = add_gauss_noise(sequence, mean="plume", sd=None, int_reg_center=int_circle_center, int_rad=int_circle_radius, flank_mask=flank_mask)
@@ -884,7 +912,6 @@ for index in range(0, df.shape[0], mod):
 
     #results_df.loc[len(results_df)] = [names[0], result, perc_95]
 
-    calc_pixel_geometry()
 
 #results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/19 - More FB w Noise/Results.xlsx")
 
