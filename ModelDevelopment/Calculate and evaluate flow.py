@@ -4,6 +4,7 @@
 import cv2
 from datetime import datetime
 from geonum import GeoPoint, GeoVector3D, GeoSetup, BASEMAP_AVAILABLE
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -809,7 +810,7 @@ def calc_pixel_geometry(dictionary):
     #show(pixel_sizes_h)
 
     pixel_area = np.multiply(pixel_size_v * 1000, pixel_sizes_h[0:-1, :] * 1000) #In m^2
-    show(pixel_area)
+    #show(pixel_area)
 
     #Calculate also the
     pixel_center_heights = np.tan(np.deg2rad(pixel_center_angles)).astype(np.float64) * dist_h
@@ -844,29 +845,109 @@ def get_timestep_lengths(names):
         timestep_lens.append(ts_len.total_seconds())
     return timestep_lens
 
+class GridInterpolator():
+
+    def __init__(self, values_to_interpolate):
+        self.values_array = values_to_interpolate
+
+    def interpolate(self, coord_0, coord_1):
+        #First, check that the given coordinate is actually within the given array
+        if coord_0 >= 0 and coord_0 < self.values_array.shape[0]:
+            if coord_1 >=0 and coord_1 < self.values_array.shape[1]:
+                # Pad the array with copies of the edge rows
+                padded_arr = np.pad(self.values_array, pad_width=1, mode="edge")
+                #print(coord)
+                padded_coord = (coord_0 + 1, coord_1 + 1)
+
+                # Round the coordinate to nearest integer
+                # Coord is given in form (y, x)
+                int_coord = (int(np.round(padded_coord[0], 0)), int(np.round(padded_coord[1], 0)))
+
+                relevant_vals = padded_arr[int_coord[0] - 1: int_coord[0] + 2, int_coord[1] - 1: int_coord[1] + 2]
+
+                x1 = int_coord[1] - 1
+                x2 = int_coord[1]
+                x3 = int_coord[1] + 1
+                y1 = int_coord[0] - 1
+                y2 = int_coord[0]
+                y3 = int_coord[0] + 1
+
+                C11 = (y1, x1)
+                C21 = (y2, x1)
+                C31 = (y3, x1)
+                C12 = (y1, x2)
+                C22 = (y2, x2)
+                C32 = (y3, x2)
+                C13 = (y1, x3)
+                C23 = (y2, x3)
+                C33 = (y3, x3)
+
+                d11 = math.dist(C11, padded_coord)
+                d12 = math.dist(C12, padded_coord)
+                d13 = math.dist(C13, padded_coord)
+                d21 = math.dist(C21, padded_coord)
+                d22 = math.dist(C22, padded_coord)
+                d23 = math.dist(C23, padded_coord)
+                d31 = math.dist(C31, padded_coord)
+                d32 = math.dist(C32, padded_coord)
+                d33 = math.dist(C33, padded_coord)
+
+                dists_mat = np.array([[d11, d12, d13],
+                                    [d21, d22, d23],
+                                    [d31, d32, d33]])
+                #print(dists_mat)
+                #Matrix of scale factor multipliers for the pixel values
+                #Each pixel contributes based on the relative size of its center
+                #distance from the point
+                scale_mat = dists_mat / np.sum(dists_mat)
+                scale_mat = np.ones_like(scale_mat) - scale_mat
+                scale_mat = scale_mat / np.sum(scale_mat)
+                print(str(coord_0) + " , " + str(coord_1))
+                contributions = np.multiply(relevant_vals, scale_mat)
+
+                return np.sum(contributions)
+            else:
+                return np.nan
+        else:
+            return np.nan
+
+    def interpolate_v(self, coords_array_0, coords_array_1):
+        function_v = np.vectorize(self.interpolate)
+        return function_v(coords_array_0, coords_array_1)
+
+    def update_values_array(self, new_array):
+        self.values_array = new_array
+
 def scale_flow_to_meters(flow, pixel_geom):
     x = np.arange(0, flow.shape[1])
     y = np.arange(0, flow.shape[0])
     X_start, Y_start = np.meshgrid(x, y)
 
-    X_dests = X_start + flow[:, :, 0]
-    Y_dests = Y_start + flow[:, :, 1]
+    X_dest = X_start + flow[:, :, 0]
+    Y_dest = Y_start + flow[:, :, 1]
 
-    #TODO Need to extract the true pixel center coordinates
+    #TODO ideally need to interpolate in case of non-integer destination values
+    #TODO, maybe it makes more sense to calulate the affine transform
+
+    #Need to extract the true pixel center coordinates
     #given the start and destination pixel indexes for each flow vector
-    #TODO See integer array indexing: https://numpy.org/doc/stable/user/basics.indexing.html
+    #See integer array indexing: https://numpy.org/doc/stable/user/basics.indexing.html
 
+    #Call the postions in the true coord system XT and YT
 
+    grid_interpolator = GridInterpolator(values_to_interpolate=pixel_geom.pixel_center_horizontal)
+    XT_start = grid_interpolator.interpolate_v(Y_start, X_start)
+    XT_dest = grid_interpolator.interpolate_v(Y_dest, X_dest)
+    grid_interpolator.update_values_array(pixel_geom.pixel_center_heights)
+    YT_start = grid_interpolator.interpolate_v(Y_start, X_start)
+    YT_dest = grid_interpolator.interpolate_v(Y_dest, X_dest)
 
     #TODO then calcuate the x and y displacement in meters
     #TODO and return this as the scaled flow
-
-
-
-
-
-
-
+    X_disp = XT_dest - XT_start
+    Y_disp = YT_dest - YT_start
+    show(X_disp)
+    show(Y_disp)
 
 ######################### Run the code:
 
@@ -923,7 +1004,7 @@ for index in range(0, df.shape[0], mod):
     #noise_flow = calculate_optical_flow_pair_Farneback(noise[0], noise[1], plot_density=5, pyramid_levels=4)
     #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=5, alpha_rc=5, epsilon=0, max_iterations=100, plot=False)
     #TODO am I actually using the epsilon param?
-    #flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=True, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
+    flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
 
     #mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
     #print(mapping_err)
@@ -935,7 +1016,7 @@ for index in range(0, df.shape[0], mod):
 
     #Scale flow to m/s
     #Scale the displacement to be in meters
-    flow = scale_flow()
+    flow = scale_flow_to_meters(flow, pixel_geom)
     #Divide by timestep length
 
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
