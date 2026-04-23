@@ -96,8 +96,8 @@ def apply_function_on_train_samples(samples_sheet, data_path, data_path_temporal
             next_img = sequence[sequence_index + 1]
             #show(next_img)
             difference = pixel_diff(current_img, next_img)
+            show(difference)
             #MOG(current_img, next_img)
-            grabCut(current_img, difference)
 
 
         #Save the results
@@ -108,5 +108,5 @@ samples_sheet = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSp
 data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2"
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 folder_to_save = "none"
-mod = 20
+mod = 1
 apply_function_on_train_samples(samples_sheet, data_path, data_path_temporal, mod)

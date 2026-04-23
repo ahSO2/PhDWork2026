@@ -725,20 +725,24 @@ def check_source_dest_equal(f1, f2, flow):
 def check_bg_ratio(iA, iB, plume_mask, flank_mask):
     masked_A = np.ma.masked_where(plume_mask>=1, iA)
     masked_B = np.ma.masked_where(np.logical_or(iB==0, flank_mask==0), iB)
-    ratio = np.ma.divide(masked_A.astype("float32"), masked_B.astype("float32"))
+    ratio = np.ma.divide(masked_B.astype("float32"), masked_A.astype("float32"))
+    #show(np.log(ratio))
     #Mask out areas where bandB is zero, and where the plume is
     #iB = np.where(flank_mask==0, 0, iB)
     #ratio = np.ma.masked_where(np.logical_or(iB==0, plume_mask>=1), ratio)
     #show(plume_mask)
 
-    plt.imshow(ratio[100:-50,50:-50])
-    plt.colorbar()
-    plt.show()
+    #plt.imshow(ratio[100:-50,50:-50])
+    #plt.colorbar()
+    #plt.show()
 
     #plt.boxplot(ratio[100:-50,50:-50].compressed())
     #plt.show()
 
-    return np.ma.std(ratio[100:-50,50:-50])
+    rel_AA = np.log(np.divide(iB.astype(np.float32), iA.astype(np.float32)))
+    show(rel_AA[100:-50,50:-50])
+
+    return np.std(np.log(ratio[100:-50,50:-50].compressed()))
 
 class PixelGeometry():
     def __init__(self):
@@ -951,7 +955,7 @@ def scale_flow_to_meters(flow, pixel_geom):
 
 ######################### Run the code:
 
-results_df = pd.DataFrame(columns=["f1_name", "inxs_prop", "noise_velo"])
+results_df = pd.DataFrame(columns=["f1_name", "90P_ln(BoA)"])
 
 #For each sample:
 df.reset_index(inplace=True)
@@ -992,19 +996,19 @@ for index in range(0, df.shape[0], mod):
     int_circle_center = dictionary["integration_region_center"]
     int_circle_radius = dictionary["integration_radius"]
     flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
-    pixel_geom = calc_pixel_geometry(dictionary)
-    timestep_lens = get_timestep_lengths(names)
+    #pixel_geom = calc_pixel_geometry(dictionary)
+    #timestep_lens = get_timestep_lengths(names)
 
     #Add noise
     #sequence, noise = add_gauss_noise(sequence, mean="plume", sd=None, int_reg_center=int_circle_center, int_rad=int_circle_radius, flank_mask=flank_mask)
     #sequence = add_gauss_noise(sequence, mean=0, sd=5)
 
     #Calculate the FB optical flow with standard parameters
-    #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=False, pyramid_levels=4)
+    flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=False, pyramid_levels=4)
     #noise_flow = calculate_optical_flow_pair_Farneback(noise[0], noise[1], plot_density=5, pyramid_levels=4)
     #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=5, alpha_rc=5, epsilon=0, max_iterations=100, plot=False)
     #TODO am I actually using the epsilon param?
-    flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
+    #flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
 
     #mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
     #print(mapping_err)
@@ -1016,7 +1020,7 @@ for index in range(0, df.shape[0], mod):
 
     #Scale flow to m/s
     #Scale the displacement to be in meters
-    flow = scale_flow_to_meters(flow, pixel_geom)
+    #flow = scale_flow_to_meters(flow, pixel_geom)
     #Divide by timestep length
 
     #calculate_flux_1D(sequence[0], flow, circle_center=int_circle_center, circle_radius=int_circle_radius, flank_mask=flank_mask)
@@ -1032,10 +1036,10 @@ for index in range(0, df.shape[0], mod):
     #if "Kilauea_2022" in names[0]:
     #std = check_bg_ratio(sequence[0], sequence[1], all_plume_mask, flank_mask)
 
-    #results_df.loc[len(results_df)] = [names[0], result, perc_95]
+    results_df.loc[len(results_df)] = [names[0], std]
 
 
-#results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/19 - More FB w Noise/Results.xlsx")
+#results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/20 - Better Eval BG Constancy/Results.xlsx")
 
 #Calculate the interpolation error
 
