@@ -5,8 +5,8 @@ import os
 from skimage.restoration import denoise_bilateral
 
 
-folder_path = "X:/volcano_cameras/Shared/Lascar/2022/2022-07-23"
-video_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/21 - Videos of Timestep Difference/Lascar_2022-07-23.mp4"
+folder_path = "X:/pering_group/Shared/Kilauea/2023-06-15/"
+video_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/21 - Videos of Timestep Difference/Kilauea_2023-06-15-NoThreshold.mp4"
 fltr = "A"
 mod=1
 max_frames = 100
@@ -45,10 +45,10 @@ filtered_sequence = np.array(filtered_sequence)
 print(filtered_sequence.shape)
 
 diff = np.abs(filtered_sequence[1:,:,:].astype("float32") - filtered_sequence[:-1, :, :].astype("float32"))
-for vis_index in range(1, diff.shape[0], 2):
-    show(diff[vis_index])
+#for vis_index in range(1, diff.shape[0], 2):
+    #show(diff[vis_index])
 
-diff = np.where(diff > difference_threshold, 1, 0)
+#diff = np.where(diff > difference_threshold, 1, 0)
 
 def normalise(image):
     image = image.astype("float32") - np.ones_like(image) * np.min(image)

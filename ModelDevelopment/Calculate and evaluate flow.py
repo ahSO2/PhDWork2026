@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy import ndimage
 from scipy.spatial import distance
+from skimage.restoration import denoise_bilateral
 import sys
 sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
@@ -19,7 +20,7 @@ data_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData
 data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal"
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 mod = 1
-timesteps = ["image_name", "next_tensec_name"]
+timesteps = ["prev_tensec_name", "image_name", "next_tensec_name"]
 #timesteps = ["image_name", "image_name_B"]
 df = pd.read_excel(samples_sheet)
 df = df[df["overall_obs"]=="No"]
@@ -849,6 +850,13 @@ def get_timestep_lengths(names):
         timestep_lens.append(ts_len.total_seconds())
     return timestep_lens
 
+def pixel_diff(current, next):
+    current = denoise_bilateral(current.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
+    next = denoise_bilateral(next.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
+
+    diff = np.abs(next.astype("float32") - current.astype("float32"))
+    return diff.astype(np.uint8)
+
 class GridInterpolator():
 
     def __init__(self, values_to_interpolate):
@@ -993,22 +1001,28 @@ for index in range(0, df.shape[0], mod):
 
     # Define the integration boundary
     dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(dictionary_name)
-    int_circle_center = dictionary["integration_region_center"]
-    int_circle_radius = dictionary["integration_radius"]
-    flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
+    #int_circle_center = dictionary["integration_region_center"]
+    #int_circle_radius = dictionary["integration_radius"]
+    #flank_mask = cv2.imread(dictionary["flank_mask_path"], -1)
     #pixel_geom = calc_pixel_geometry(dictionary)
-    #timestep_lens = get_timestep_lengths(names)
+    timestep_lens = get_timestep_lengths(names)
 
     #Add noise
     #sequence, noise = add_gauss_noise(sequence, mean="plume", sd=None, int_reg_center=int_circle_center, int_rad=int_circle_radius, flank_mask=flank_mask)
     #sequence = add_gauss_noise(sequence, mean=0, sd=5)
 
     #Calculate the FB optical flow with standard parameters
-    flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=False, pyramid_levels=4)
+    #flow = calculate_optical_flow_pair_Farneback(sequence[0], sequence[1], plot_density=False, pyramid_levels=4)
     #noise_flow = calculate_optical_flow_pair_Farneback(noise[0], noise[1], plot_density=5, pyramid_levels=4)
     #flow, rb = calculate_optical_flow_pair_HS(sequence[0], sequence[1], alpha_rb=5, alpha_rc=5, epsilon=0, max_iterations=100, plot=False)
     #TODO am I actually using the epsilon param?
-    #flow, err = calculate_optical_flow_pair_LK(sequence[0], sequence[1], n=1, plot=False, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
+    flow, err = calculate_optical_flow_pair_LK(sequence[1], sequence[2], n=1, plot=True, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
+
+    diff_1 = pixel_diff(sequence[0], sequence[1])
+    show(diff_1)
+    diff_2 = pixel_diff(sequence[1], sequence[2])
+    diff_flow, diff_err = calculate_optical_flow_pair_LK(diff_1, diff_2, n=1, plot=True, max_level=4, win_size=(40,40), ev_filtering=False, min_eig_threshold=0.0005)
+
 
     #mapping_err = check_source_dest_equal(sequence[0], sequence[1], flow)
     #print(mapping_err)
@@ -1036,7 +1050,7 @@ for index in range(0, df.shape[0], mod):
     #if "Kilauea_2022" in names[0]:
     #std = check_bg_ratio(sequence[0], sequence[1], all_plume_mask, flank_mask)
 
-    results_df.loc[len(results_df)] = [names[0], std]
+    #results_df.loc[len(results_df)] = [names[0], std]
 
 
 #results_df.to_excel("C:/Users/ggp24ash/Documents/Scratch Data/Optical Flow Outputs/20 - Better Eval BG Constancy/Results.xlsx")

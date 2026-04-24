@@ -56,6 +56,22 @@ def equally_scale_sequences(s1, s2):
     s2 = np.divide(s2, sf)
     return s1, s2
 
+def normalise_for_ss(sequence, names):
+    #Start with images in range [0,1023]
+    for index in range(0):
+        image = sequence[index].astype("float32")
+        name = names[index]
+        ss = int(name.split("_")[3][:-2])
+        ssr = 1000000/ss
+
+def adaptive_threshold(image, dim):
+    kernel = np.ones((dim, dim)) * (1/(dim*dim))
+    threshold = cv2.filter2D(image, -1, kernel)
+    result = np.where(image > threshold, 1, 0)
+    return result
+
+
+
 def show_hist(image):
     n_bins=20
     counts, bins = np.histogram(image.flatten(), n_bins, [np.min(image), np.max(image)])
@@ -91,14 +107,16 @@ for llo in locations:
         #Now attempt segmentation:
         sequence = np.array(sequence).astype(np.float32)
         sequence_B = np.array(sequence_B).astype(np.float32)
+
         #Scale to range [0,255]
-        sequence, sequence_B = equally_scale_sequences(sequence, sequence_B)
+        #sequence, sequence_B = equally_scale_sequences(sequence, sequence_B)
+
         #Calculate the difference image
         difference = pixel_diff(sequence[0], sequence[1])
         #diff_entropy = entropy(difference, disk(20))
-        #show(difference)
+        show(difference)
         #show(diff_entropy)
-        show_hist(difference)
+        #show_hist(difference)
 
         #Calculate relative absorbance
         #Take log of bandB/bandA, for the current timestep image
@@ -107,6 +125,22 @@ for llo in locations:
         ratio = np.divide(sequence_B[0], sequence[0])
         masked_ratio = np.ma.masked_where(edge_mask>0, ratio)
         rel_AA = np.ma.log(masked_ratio)
+        #show(rel_AA)
+
+        #Goal 1: Select points which are likely to be plume
+
+        #Mask out flank
+
+        #Select points which are moving above the local mean
+        difference = denoise_bilateral(difference.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
+        diff_pts = cv2.adaptiveThreshold(difference.astype("uint8"), maxValue=1, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=21, C=-3)
+        show(diff_pts)
+
+        #Select points which are absorbing above local mean
+        abs_pts = adaptive_threshold(rel_AA, dim=21)
+        show(abs_pts) #TODO Need to add a C value
+
+        #Goal 2: Take those points and
 
         #product = np.ma.multiply(rel_AA, difference)
         #product = np.ma.divide(product, rel_AA + difference)
