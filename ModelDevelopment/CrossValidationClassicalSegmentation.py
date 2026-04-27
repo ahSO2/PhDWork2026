@@ -137,9 +137,11 @@ for llo in locations:
     print("Running tests on " + llo + "-left-out CV Fold.")
     train_df = pd.read_excel(df_path + llo + "LeftOut_Train.xlsx")
     train_df = train_df[train_df["overall_obs"] == "No"]
+    #train_df = train_df[train_df["image_name"].str.contains("Merapi")]
     train_df.reset_index(inplace=True)
     # For each sample
     for sample_index in range(0, train_df.shape[0], mod):
+        print(sample_index)
         # Read the timestep sequence
         sequence, names, plume_mask, flank_mask = read_sample(sample_index, train_df, timesteps)
         sequence_B, names_B, NA, flank_mask = read_sample(sample_index, train_df, timesteps_B)
@@ -147,7 +149,11 @@ for llo in locations:
         #Now attempt segmentation:
         sequence = np.array(sequence).astype(np.float32)
         sequence_B = np.array(sequence_B).astype(np.float32)
-        #show(sequence[0])
+        #show(sequence[0] - sequence_B[0])
+        show(sequence[0])
+        masked = np.where(plume_mask==1, 1, sequence[0])
+        show(masked)
+
 
         #Scale to range [0,255]
         #sequence, sequence_B = equally_scale_sequences(sequence, sequence_B)
@@ -179,6 +185,7 @@ for llo in locations:
         #rel_AA = np.ma.where(rel_AA<0, 0, rel_AA)
         #Subtract such that the mean AA over the flank is zero
 
+        rel_AA = np.ma.where(flank_mask==0, 0, rel_AA)
         show(rel_AA)
 
         #Goal 1: Select points which are likely to be plume
@@ -186,16 +193,19 @@ for llo in locations:
         #Mask out flank
 
         #Select points which are moving above the local mean
-        #difference = denoise_bilateral(difference.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
-        #diff_pts = cv2.adaptiveThreshold(difference.astype("uint8"), maxValue=1, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=21, C=-3)
+        difference = denoise_bilateral(difference.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
+        diff_pts = cv2.adaptiveThreshold(difference.astype("uint8"), maxValue=1, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=21, C=0)
         #show(diff_pts)
 
         #Select points which are absorbing above local mean
-        #abs_pts = adaptive_threshold(rel_AA, dim=21)
+        rel_AA = np.ma.masked_where(flank_mask==0, rel_AA)
+        abs_pts = np.ma.where(rel_AA>np.ma.median(rel_AA), 1, 0)
         #show(abs_pts) #TODO Need to add a C value
 
         #Goal 2: Take those points and
 
+        selected_points = np.where(np.logical_and(diff_pts>0, abs_pts>0), rel_AA, 0)
+        show(selected_points)
         #product = np.ma.multiply(rel_AA, difference)
         #product = np.ma.divide(product, rel_AA + difference)
 
@@ -212,6 +222,15 @@ for llo in locations:
         #Plot features:
         #show(plume_mask)
 
+        #Proportion of selected points which are in the plume
+        #all_selected_points = np.where(selected_points>0, 1, 0)
+        #show(all_selected_points)
+        #selected_points_in_plume = np.where(plume_mask==1, all_selected_points, 0)
+        #show(selected_points_in_plume)
+        #print(np.round(np.sum(selected_points_in_plume)/np.sum(all_selected_points), 2))
+
+
+        '''
         fig, axs = plt.subplots()
         colors = ["c", "y"]
         labels = ["not plume", "plume"]
@@ -225,6 +244,7 @@ for llo in locations:
         plt.xlabel("Pixel difference")
         plt.ylabel("Relative absorbance")
         plt.show()
+        '''
 
 
 
