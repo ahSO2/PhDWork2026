@@ -22,11 +22,11 @@ def check_registration(image_A, image_B):
     plt.colorbar()
     plt.show()
 
-img_A = cv2.imread("DataToView/2023-06-08T032600_fltrA_1ag_699997ss_Plume.png", -1)
-img_B = cv2.imread("DataToView/2023-06-08T032600_fltrB_1ag_99980ss_Plume.png", -1)
+img_A = cv2.imread("DataToView/Merapi_2023-06-01T010610_fltrA_1ag_999904ss_Plume.png", -1)
+img_B = cv2.imread("DataToView/2023-06-01T010610_fltrB_1ag_149987ss_Plume.png", -1)
 
-points_A = np.float32([[161, 308], [311, 265], [354, 270], [488, 342]])
-points_B = np.float32([[162, 308], [311, 265], [355, 271], [491, 344]])
+points_A = np.float32([[148, 311], [293, 266], [470, 341], [30, 331]])
+points_B = np.float32([[163, 308], [310, 264], [488, 342], [40, 327]])
 
 visualise_registration_points(img_A, img_B, points_A, points_B)
 
