@@ -7,14 +7,15 @@ import pandas as pd
 from skimage.restoration import denoise_bilateral
 from skimage.filters.rank import entropy
 from skimage.morphology import disk
-
 import VolcDictionaryWithCorrectClears
-from VolcDictionaryWithCorrectClears import *
 
 def show(image):
-    plt.imshow(image, cmap="gray")
-    plt.colorbar()
-    plt.show()
+    if plot_stuff == True:
+        plt.imshow(image, cmap="gray")
+        plt.colorbar()
+        plt.show()
+    else:
+        pass
 
 def mask_sensor_marks(image, mask_path):
     if mask_path == "None":
@@ -34,8 +35,6 @@ def read_sample(sample_index, df, timesteps):
     smmn_A = dictionary["sensor_marks_mask_A"]
     smmn_B = dictionary["sensor_marks_mask_B"]
     all_plume_mask = None
-
-
 
     for timestep_name in timesteps:
         if timestep_name == "image_name":
@@ -90,8 +89,8 @@ def normalise_for_ss(sequence, names):
     for index in range(0, len(sequence)):
         name = names[index]
         ss = int(name.split("_")[4][:-2])
-        print(name)
-        print(ss)
+        #print(name)
+        #print(ss)
         ssr = 1000000/ss
         scaled_sequence.append(sequence[index].astype("float32") * ssr)
     return scaled_sequence
@@ -128,12 +127,16 @@ data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentatio
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/SensorMarkMasks/"
 flank_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"
-mod = 1
+mod = 5
+save_results = False
+plot_stuff = True
 
 features_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/"
+results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/1 - Selecting seed points/"
 
 for llo in locations:
     #os.mkdir(features_save_path + "wo" + llo)
+    results_df = pd.DataFrame(columns=["image_name", "precision", "recall"])
     print("Running tests on " + llo + "-left-out CV Fold.")
     train_df = pd.read_excel(df_path + llo + "LeftOut_Train.xlsx")
     train_df = train_df[train_df["overall_obs"] == "No"]
@@ -150,27 +153,23 @@ for llo in locations:
         sequence = np.array(sequence).astype(np.float32)
         sequence_B = np.array(sequence_B).astype(np.float32)
         #show(sequence[0] - sequence_B[0])
-        show(sequence[0])
-        masked = np.where(plume_mask==1, 1, sequence[0])
-        show(masked)
-
-
-        #Scale to range [0,255]
-        #sequence, sequence_B = equally_scale_sequences(sequence, sequence_B)
+        #show(sequence[0])
+        #masked = np.where(plume_mask==1, 1, sequence[0])
+        #show(masked)
 
         #Calculate the difference image
         scaled_sequence = normalise_for_ss(sequence, names)
         #scaled_sequence_B = normalise_for_ss(sequence_B, names_B)
-        #show(scaled_sequence[0])
         #show(scaled_sequence_B[0])
 
         #unscaled_diff = pixel_diff(sequence[0], sequence[1])
         difference = pixel_diff(scaled_sequence[0], scaled_sequence[1])
+
         #diff_entropy = entropy(difference, disk(20))
         #show(np.concatenate([unscaled_diff, difference], axis=1))
         #show(diff_entropy)
         #show_hist(difference)
-        show(difference)
+        #show(difference)
 
         #Calculate relative absorbance
         #Take log of bandB/bandA, for the current timestep image
@@ -182,25 +181,30 @@ for llo in locations:
         flank_AA = np.ma.median(np.ma.masked_where(flank_mask==1, rel_AA))
         rel_AA = rel_AA - flank_AA
         rel_AA = np.ma.filled(rel_AA, fill_value=0)
-        #rel_AA = np.ma.where(rel_AA<0, 0, rel_AA)
+        rel_AA = np.where(rel_AA<0, 0, rel_AA)
         #Subtract such that the mean AA over the flank is zero
-
-        rel_AA = np.ma.where(flank_mask==0, 0, rel_AA)
-        show(rel_AA)
+        #rel_AA = np.where(flank_mask==0, 0, rel_AA)
+        #show(rel_AA)
 
         #Goal 1: Select points which are likely to be plume
 
-        #Mask out flank
+        #Mask out flank (and a little more!)
+        flank_mask = cv2.blur(np.where(flank_mask==0, 5, 0), ksize=(10, 10))
+        show(flank_mask)
+        difference = np.where(flank_mask>0, 0, difference)
+        rel_AA = np.where(flank_mask>0, 0, rel_AA)
+        show(difference)
+        show(rel_AA)
 
         #Select points which are moving above the local mean
         difference = denoise_bilateral(difference.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
         diff_pts = cv2.adaptiveThreshold(difference.astype("uint8"), maxValue=1, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=21, C=0)
-        #show(diff_pts)
+        show(diff_pts)
 
         #Select points which are absorbing above local mean
-        rel_AA = np.ma.masked_where(flank_mask==0, rel_AA)
-        abs_pts = np.ma.where(rel_AA>np.ma.median(rel_AA), 1, 0)
-        #show(abs_pts) #TODO Need to add a C value
+        rel_AA = np.ma.masked_where(np.logical_or(flank_mask>0, edge_mask>0), rel_AA)
+        abs_pts = np.where(rel_AA>np.ma.median(rel_AA), 1, 0)
+        show(abs_pts)
 
         #Goal 2: Take those points and
 
@@ -223,28 +227,34 @@ for llo in locations:
         #show(plume_mask)
 
         #Proportion of selected points which are in the plume
-        #all_selected_points = np.where(selected_points>0, 1, 0)
+        all_selected_points = np.where(selected_points>0, 1, 0)
         #show(all_selected_points)
-        #selected_points_in_plume = np.where(plume_mask==1, all_selected_points, 0)
+        #show(masked)
+        selected_points_in_plume = np.where(plume_mask==1, all_selected_points, 0)
         #show(selected_points_in_plume)
-        #print(np.round(np.sum(selected_points_in_plume)/np.sum(all_selected_points), 2))
-
-
+        precision = np.round(np.sum(selected_points_in_plume)/np.sum(all_selected_points), 2)
+        recall = np.round(np.sum(selected_points_in_plume)/np.sum(plume_mask), 2)
+        results_df.loc[len(results_df)] = [names[0], precision, recall]
         '''
         fig, axs = plt.subplots()
-        colors = ["c", "y"]
+        colors = ["c", "m"]
         labels = ["not plume", "plume"]
         index = 0
         for mask in [1, 0]:
             d = np.ma.masked_where(np.logical_or(plume_mask == mask,edge_mask > 0), difference).compressed()
             a = np.ma.masked_where(np.logical_or(plume_mask == mask,edge_mask > 0), rel_AA).compressed()
-            axs.scatter(d, a, c=colors[index], alpha=0.01, label=labels[index])
+            axs.scatter(d, a, c=colors[index], alpha=0.5, label=labels[index])
             index += 1
         axs.legend()
         plt.xlabel("Pixel difference")
         plt.ylabel("Relative absorbance")
         plt.show()
+
+        #show(sequence[0])
+        #show(difference)
+        #show(rel_AA)
         '''
+    results_df.to_excel(results_save_path + llo + "LeftOutFoldResults.xlsx")
 
 
 
