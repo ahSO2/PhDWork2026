@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
 from scipy.interpolate import RegularGridInterpolator
+import snakeviz
+import cProfile
 
 #Informed by example code from:
 #https://people.csail.mit.edu/sparis/bf/#code
@@ -35,6 +37,7 @@ def gaussian_3D(s_s, s_r):
     term1 = np.divide(-1 * (np.square(X) + np.square(Y)), 2*s_s*s_s)
     term2 = np.divide(-1 * np.square(R), 2*s_r*s_r)
     gauss = np.exp(term1 + term2)
+    gauss = gauss / np.sum(gauss)
 
     print("Smoothing in the (x, y, range) space with a 3D gaussian of dimension:" + str(gauss.shape))
     print("This is the dimension in the downsampled image.")
@@ -52,7 +55,7 @@ def cross_bilateral_filter_fast(image, ref_img, sigma_s, sigma_r, sa_s, sa_r):
     #Step 1 - Initialise downsampled array
     range_max = np.max(ref_img)
     range_min = np.min(ref_img)
-    dims = (int(np.ceil(image.shape[0]/sa_s)), int(np.ceil(image.shape[1]/sa_s)), int(np.ceil((range_max - range_min)/sa_r)))
+    dims = (int(np.ceil(image.shape[0]/sa_s)), int(np.ceil(image.shape[1]/sa_s)), int(np.ceil((range_max - range_min)/sa_r) + 1))
     wd_id = np.zeros(shape=dims)
     wd = np.zeros(shape=dims)
 
@@ -63,9 +66,9 @@ def cross_bilateral_filter_fast(image, ref_img, sigma_s, sigma_r, sa_s, sa_r):
     #wi and w (i.e. fill out the arrays created in Step 1).
     x_vals = np.arange(image.shape[1])
     y_vals = np.arange(image.shape[0])
-    Xd = np.floor(x_vals/sa_s).astype(np.uint8) #For each pixel, the corresponding downsampled x-coord
-    Yd = np.floor(y_vals/sa_s).astype(np.uint8)
-    Rd = np.floor((ref_img - range_min)/sa_r).astype(np.uint8)
+    Xd = np.floor(x_vals/sa_s).astype(np.uint16) #For each pixel, the corresponding downsampled x-coord
+    Yd = np.floor(y_vals/sa_s).astype(np.uint16) #TODO Note due to uint16 datatype the maximum downsampled size is 2^16
+    Rd = np.floor((ref_img - range_min)/sa_r).astype(np.uint16)
 
     #For every pixel, add its I(x,y) and Wq = 1 values to the "bucket" corresponding to its downsampled coordinates.
     #TODO can probably do this more efficiently with array reshaping
@@ -77,7 +80,6 @@ def cross_bilateral_filter_fast(image, ref_img, sigma_s, sigma_r, sa_s, sa_r):
             wd_id[yd, xd, rd] += image[y, x]
             wd[yd, xd, rd] += 1
 
-    #show(wd_id[:,:,30])
 
     #Step 4 - Define the gaussian product, and convolve.
     g = gaussian_3D(sigma_s/sa_s, sigma_r/sa_r)
@@ -122,14 +124,25 @@ def cross_bilateral_filter_fast(image, ref_img, sigma_s, sigma_r, sa_s, sa_r):
     filtered_result = np.divide(wb_ib, wb)
     #show(wb_ib)
     #show(wb)
-    show(filtered_result)
+    #show(filtered_result)
+    return filtered_result
 
 sample_activation = sample_activation * 100
 
-ss_img = np.zeros(shape=(486, 648))
-ss_img[410:421,510:521] = 10
-ss_edge = np.zeros(shape=(486, 648))
-ss_edge[400:431,500:531] = 5
-show(ss_img)
-show(ss_edge)
-cross_bilateral_filter_fast(ss_img, ss_edge, sigma_s=5, sigma_r=4, sa_s=2, sa_r=2)
+
+#ss_img = np.zeros(shape=(486, 648))
+#ss_img[410:421,510:521] = 10
+#ss_edge = np.zeros(shape=(486, 648))
+#ss_edge[400:431,500:531] = 5
+#show(ss_img)
+#show(ss_edge)
+
+#cProfile.run("cross_bilateral_filter_fast(sample_activation, sample_img, sigma_s=15, sigma_r=4, sa_s=2, sa_r=2)", filename="profile.out")
+
+
+
+#fig, axs = plt.subplots(ncols=3)
+#axs[0].imshow(sample_img, cmap="gray")
+#axs[1].imshow(sample_activation, cmap="gray")
+#axs[2].imshow(result, cmap="gray")
+#plt.show()

@@ -12,6 +12,7 @@ from skimage.morphology import disk
 from skimage.segmentation import felzenszwalb, slic
 from skimage.segmentation import mark_boundaries
 import VolcDictionaryWithCorrectClears
+from FastBilateral import *
 
 def show(image, title=None):
     if plot_stuff == True:
@@ -243,7 +244,7 @@ def calc_bilateral_term(region_to_smooth, edge_image_region, gauss_s, gauss_r):
     return total/norm
 
 
-def cross_bilateral_filter(to_smooth, edge_image, sigma_s, sigma_r):
+def cross_bilateral_filter_bf(to_smooth, edge_image, sigma_s, sigma_r):
     #For each pixel in the image to be smoothed
     original_shape = to_smooth.shape
     gauss_width = max([sigma_s*2 + 1, 5]) #Must be odd - gives kernel size of gaussian filters
@@ -285,11 +286,11 @@ data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentatio
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/SensorMarkMasks/"
 flank_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"
-mod = 15
+mod = 7
 
 plot_stuff = True
-activation_thresholds = [0, 0.05, 0.1, 0.2, 0.3, "adp"]
-results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/26 - Cross Bilateral Filter/"
+#activation_thresholds = [0, 0.05, 0.1, 0.2, 0.3, "adp"]
+#results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/26 - Cross Bilateral Filter/"
 #df_columns = []
 #for threshold in activation_thresholds:
 #    df_columns.append("pr_" + str(threshold))
@@ -354,16 +355,27 @@ for llo in locations:
         dark_pixels = np.where(flank_mask>0, 0, dark_ratio)
 
         #total = np.multiply(dark_pixels, diff_pts * abs_pts)
-        total = np.multiply(diff_pts + abs_pts, dark_pixels)
+        #total = np.multiply(diff_pts + abs_pts, dark_pixels)
         #show(total)
         t_u_t, t_m_t, t_l_t = calc_hist(total, plot=False, peak_index=0)
-        thresh_total = np.where(total>= t_m_t, 1, 0)
+        thresh_total = np.where(total>= t_m_t, total, 0)
         #compare_hist(plume_mask, total)
 
         #show(sequence[0][0:5, 0:5])
-        #cross_bilateral_filter(total[100:300,300:500], sequence[0][100:300,300:500], 10, 6)
-        np.save(results_save_path + "bandA_" + names[0], sequence[0])
-        np.save(results_save_path + "activation_" + names[0], total)
+        #total = total * 100
+        #show(total)
+        #show(sequence[0])
+        #filtered_total = cross_bilateral_filter_fast(total * 100, sequence[0], sigma_s=50, sigma_r=40, sa_s=10, sa_r=5)
+        #filtered_total = cross_bilateral_filter_fast(filtered_total, sequence[0], sigma_s=20, sigma_r=40, sa_s=5, sa_r=8)
+        #show(filtered_total)
+        #fig, axs = plt.subplots(ncols=4)
+        #axs[0].imshow(sequence[0], cmap="gray")
+        #axs[1].imshow(total * 100, cmap="gray")
+        #axs[2].imshow(thresh_total * 100, cmap="gray")
+        #axs[3].imshow(filtered_total, cmap="gray")
+        #plt.show()
+        #np.save(results_save_path + "bandA_" + names[0], sequence[0])
+        #np.save(results_save_path + "activation_" + names[0], total)
 
         if 1 == 1:
             h = 2
@@ -389,13 +401,13 @@ for llo in locations:
         band_B_mask = cv2.blur(np.where(sequence_B[0]==0, 5, 0), ksize=(10, 10))
         band_B_mask = np.where(band_B_mask > 0, 1, 0)
 
-        activation_thresholds[-1] = t_m_t
-        for threshold in activation_thresholds:
+        #activation_thresholds[-1] = t_m_t
+        #for threshold in activation_thresholds:
             #Calculate the precision and recall for that threshold
-            p = precision(plume_mask, total, [threshold], zero_mask=band_B_mask)[0]
-            r = recall(plume_mask, total, [threshold], zero_mask=band_B_mask)[0]
+            #p = precision(plume_mask, total, [threshold], zero_mask=band_B_mask)[0]
+            #r = recall(plume_mask, total, [threshold], zero_mask=band_B_mask)[0]
             #Add to the dataframe row
-            df_row = df_row + [p, r]
+            #df_row = df_row + [p, r]
 
         #results_df.loc[len(results_df)] = df_row
     #results_df.to_excel(results_save_path + "PrecisionRecall.xlsx")
