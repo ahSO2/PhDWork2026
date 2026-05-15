@@ -2,6 +2,7 @@ import os
 
 import cv2
 import matplotlib.pyplot as plt
+import numpy
 import numpy as np
 import pandas as pd
 import scipy.signal
@@ -12,10 +13,12 @@ from skimage.segmentation import felzenszwalb, slic
 from skimage.segmentation import mark_boundaries
 import VolcDictionaryWithCorrectClears
 
-def show(image):
+def show(image, title=None):
     if plot_stuff == True:
         plt.imshow(image, cmap="gray")
         plt.colorbar()
+        if title != None:
+            plt.title(title)
         plt.show()
     else:
         pass
@@ -77,7 +80,7 @@ def normalise_by_max_value(sequence, names, plot):
     sss = [] #Just recording for interest
     for index in range(0, len(sequence)):
         p95 = np.percentile(sequence[index], 95)
-        print(p95)
+        #print(p95)
         percentiles.append(p95)
         ss = int(names[index].split("_")[4][:-2])
         sss.append(ss)
@@ -134,35 +137,44 @@ def calc_rel_AA(sequence, sequence_B, flank_mask):
     # Subtract such that the mean AA over the flank is zero
     rel_AA = np.where(flank_mask == 0, 0, rel_AA)
     return rel_AA
-def precision(plume_mask, activation, thresholds):
+def precision(plume_mask, activation, thresholds, zero_mask):
     '''Calculate the precision of the prediction of plume pixels at given set of threshold vals.'''
     precisions = []
     for threshold in thresholds:
         predicted_plume = np.where(activation >= threshold, 1, 0)
         if np.sum(predicted_plume) > 0:
+            if type(zero_mask) is np.ndarray:
+                '''Mask out area where bandB is zero from consideration.'''
+                predicted_plume = np.where(zero_mask > 0, 0, predicted_plume)
+
             correct_plume = np.where(plume_mask>0, predicted_plume, 0)
+            #show(predicted_plume, "predicted_plume")
+            #show(correct_plume, "correct_plume")
             p = np.sum(correct_plume)/np.sum(predicted_plume)
         else:
             p=1
         precisions.append(p)
     return precisions
 
-def recall(plume_mask, activation, thresholds):
+def recall(plume_mask, activation, thresholds, zero_mask):
     '''Calculate which proportion of the plume is identified, given a set of threshold values.'''
     recalls = []
+    if type(zero_mask) is np.ndarray:
+        plume_mask = np.where(zero_mask > 0, 0, plume_mask)
     for threshold in thresholds:
         if np.sum(plume_mask) > 0:
             predicted_plume = np.where(activation>=threshold, 1, 0)
             predicted_plume = np.where(plume_mask>0, predicted_plume, 0)
-            #show(predicted_plume)
-            #show(plume_mask)
+            #show(predicted_plume, "predicted_plume")
+            #show(plume_mask, "plume_mask")
             r = np.sum(predicted_plume)/np.sum(plume_mask)
         else:
             r = np.nan
         recalls.append(r)
     return recalls
 
-def calc_hist(image, plot):
+def calc_hist(image, plot, peak_index=-1):
+    '''"Peak_index param determines which of the identified peaks is used to set the thresholds.'''
     n_bins=40
     counts, bins = np.histogram(image.flatten(), n_bins, [np.min(image), np.max(image)])
     counts[0] = 0 #Set the first bin count value to zero to allow detection of the first peak
@@ -170,8 +182,11 @@ def calc_hist(image, plot):
     bin_centers = np.linspace(bin_length/2, bin_length * (n_bins - 1 + 0.5), n_bins)
     peaks, properties = scipy.signal.find_peaks(counts, prominence=np.max(counts)/10, distance=5, width=1)
 
-    threshold = bin_centers[peaks[-1]] + (properties["widths"][-1] * bin_length)#TODO plus 1/2 peak width?
-    lower_threshold = bin_centers[peaks[-1]]
+
+    upper_threshold = bin_centers[peaks[peak_index]] + (properties["widths"][peak_index] * bin_length)
+    middle_threshold = bin_centers[peaks[peak_index]]
+    lower_threshold = bin_centers[peaks[peak_index]] - (properties["widths"][peak_index] * bin_length)
+
 
     if plot == True:
         fit = np.polyfit(bin_centers, counts, deg=10)
@@ -181,9 +196,85 @@ def calc_hist(image, plot):
         plt.scatter(bin_centers, np.ones_like(bin_centers))
         plt.plot(bin_centers[peaks], counts[peaks], "x")
         print(properties["widths"])
-        plt.axvline(x=threshold)
+        plt.axvline(x=upper_threshold)
+        plt.axvline(x=middle_threshold)
+        plt.axvline(x=lower_threshold)
         plt.show()
-    return threshold, lower_threshold
+    return upper_threshold, middle_threshold, lower_threshold
+
+def compare_hist(plume_mask, image):
+    '''Compare the distribution of plume vs non-plume pixels.'''
+    plume_pixels = np.ma.masked_where(plume_mask==0, image).compressed()
+    #non_plume_pixels = np.ma.masked_where(plume_mask==1, image).compressed()
+    #show(image)
+    n_bins = 20
+    cp, bp = np.histogram(plume_pixels, n_bins, [np.min(plume_pixels), np.max(plume_pixels)])
+    cp[0] = 0
+    cp = cp / np.max(cp)
+    ca, ba = np.histogram(image.flatten(), n_bins, [np.min(image.flatten()), np.max(image.flatten())])
+    ca[0] = 0
+    ca = ca/ np.max(ca)
+    plt.stairs(cp, bp, label="Plume")
+    plt.stairs(ca, ba, label="All pixels")
+    plt.legend()
+    plt.show()
+
+def get_2D_gauss_kernel(kernel_size, sigma):
+    k = np.zeros((kernel_size, kernel_size))
+    k[int(kernel_size/2), int(kernel_size/2)] = 1
+    k = cv2.GaussianBlur(k, ksize=(kernel_size, kernel_size), sigmaX=sigma, borderType=cv2.BORDER_REFLECT)
+    #show(k)
+    return k
+
+def calc_bilateral_term(region_to_smooth, edge_image_region, gauss_s, gauss_r):
+    central_index = int(np.floor(region_to_smooth.shape[0]/2))
+    total = 0
+    norm = 0
+    for x in range(0, region_to_smooth.shape[1]):
+        for y in range(0, region_to_smooth.shape[0]):
+            #Select weight for distance from cental pixel
+            s_weight = gauss_s[y, x] #TODO should this be altered to be a 1D gaussian
+            #Calculate distance from central pixel in colour space
+            d = np.abs(edge_image_region[central_index, central_index] - edge_image_region[y, x])
+            r_weight = gauss_r[int(np.round(d, 0))]
+            term = s_weight * r_weight * region_to_smooth[y, x]
+            total += term
+            norm += s_weight * r_weight
+    return total/norm
+
+
+def cross_bilateral_filter(to_smooth, edge_image, sigma_s, sigma_r):
+    #For each pixel in the image to be smoothed
+    original_shape = to_smooth.shape
+    gauss_width = max([sigma_s*2 + 1, 5]) #Must be odd - gives kernel size of gaussian filters
+    pad_width = int(np.floor(gauss_width / 2))
+    to_smooth = cv2.copyMakeBorder(to_smooth, pad_width, pad_width, pad_width, pad_width, cv2.BORDER_REFLECT)
+    edge_image = cv2.copyMakeBorder(edge_image, pad_width, pad_width, pad_width, pad_width, cv2.BORDER_REFLECT)
+
+    gauss_s = get_2D_gauss_kernel(gauss_width, sigma_s)
+    gauss_r = cv2.getGaussianKernel(int(np.ceil(np.max(edge_image)) * 2 + 1), sigma_r)
+    gauss_r = gauss_r[int(np.floor(gauss_r.shape[0]/2) + 1):].flatten()
+    #show(np.stack([gauss_r] * 20, axis=0))
+
+    result = np.zeros(shape=original_shape)
+    for i in range(0, original_shape[1]):
+        print(i)
+        for j in range(0, original_shape[0]):
+            central_pixel = [j + pad_width, i + pad_width]
+            to_smooth_region = to_smooth[central_pixel[0] - pad_width:central_pixel[0] + pad_width + 1, central_pixel[1] - pad_width:central_pixel[1] + pad_width + 1]
+            edge_image_region = edge_image[central_pixel[0] - pad_width:central_pixel[0] + pad_width + 1, central_pixel[1] - pad_width:central_pixel[1] + pad_width + 1]
+            filtered_value = calc_bilateral_term(to_smooth_region, edge_image_region, gauss_s, gauss_r)
+            result[j, i] = filtered_value
+
+    fig, axs = plt.subplots(ncols=3)
+    axs[0].imshow(edge_image, cmap="gray")
+    axs[0].set_title("Original Image")
+    axs[1].imshow(to_smooth, cmap="gray")
+    axs[1].set_title("Activation")
+    axs[2].imshow(result, cmap="gray")
+    axs[2].set_title("Smoothed")
+    plt.show()
+
 
 locations = ["Cotopaxi"]
 df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/"
@@ -194,12 +285,18 @@ data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentatio
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/SensorMarkMasks/"
 flank_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"
-mod = 1
-save_results = False
+mod = 15
+
 plot_stuff = True
+activation_thresholds = [0, 0.05, 0.1, 0.2, 0.3, "adp"]
+results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/26 - Cross Bilateral Filter/"
+#df_columns = []
+#for threshold in activation_thresholds:
+#    df_columns.append("pr_" + str(threshold))
+#    df_columns.append("re_" + str(threshold))
 
 for llo in locations:
-    results_df = pd.DataFrame(columns=["image_name", "IOU"])
+    #results_df = pd.DataFrame(columns=["image_name"] + df_columns)
     print("Running tests on " + llo + "-left-out CV Fold.")
     train_df = pd.read_excel(df_path + llo + "LeftOut_Train.xlsx")
     train_df = train_df[train_df["overall_obs"] == "No"]
@@ -223,8 +320,6 @@ for llo in locations:
         double_scaled_sequence = scale_to_range(scaled_sequence, max_value=100, plot=False)
         double_scaled_sequence_B = scale_to_range(scaled_sequence_B, max_value=100, plot=False)
 
-
-
         double_scaled_difference = pixel_diff(double_scaled_sequence[0], double_scaled_sequence[1])
         double_scaled_difference_B = pixel_diff(double_scaled_sequence_B[0], double_scaled_sequence_B[1])
 
@@ -244,13 +339,13 @@ for llo in locations:
         #show(flank_mask)
         double_scaled_difference = np.where(flank_mask>0, 0, double_scaled_difference)
         rel_AA = np.where(flank_mask>0, 0, rel_AA)
+        #show(rel_AA)
 
-        d_thresh, d_l_thresh = calc_hist(double_scaled_difference, plot=False)
-        diff_pts = np.where(double_scaled_difference > d_thresh, 0.5, 0) + np.where(double_scaled_difference > d_l_thresh, 0.5, 0)
+        d_upper_thresh, d_middle_thresh, d_lower_thresh = calc_hist(double_scaled_difference, plot=False)
+        diff_pts = np.where(double_scaled_difference > d_upper_thresh, 0.5, 0) + np.where(double_scaled_difference > d_middle_thresh, 0.5, 0)
 
-
-        AA_threshold, AA_lower_threshold = calc_hist(rel_AA, plot=False)
-        abs_pts = np.where(rel_AA>AA_threshold, 0.5, 0) + np.where(rel_AA>AA_lower_threshold, 0.5, 0)
+        AA_upper_threshold, AA_middle_threshold, AA_lower_threshold = calc_hist(rel_AA, plot=False)
+        abs_pts = np.where(rel_AA>AA_upper_threshold, 0.5, 0) + np.where(rel_AA>AA_middle_threshold, 0.5, 0)
 
         max_val = np.max(sequence[0])
         darkness_img = max_val + 1 - sequence[0].astype("float32")
@@ -258,7 +353,17 @@ for llo in locations:
         dark_ratio = np.divide(sky_pixels, np.ma.max(sky_pixels))
         dark_pixels = np.where(flank_mask>0, 0, dark_ratio)
 
-        total = np.multiply(dark_pixels, diff_pts * abs_pts)
+        #total = np.multiply(dark_pixels, diff_pts * abs_pts)
+        total = np.multiply(diff_pts + abs_pts, dark_pixels)
+        #show(total)
+        t_u_t, t_m_t, t_l_t = calc_hist(total, plot=False, peak_index=0)
+        thresh_total = np.where(total>= t_m_t, 1, 0)
+        #compare_hist(plume_mask, total)
+
+        #show(sequence[0][0:5, 0:5])
+        #cross_bilateral_filter(total[100:300,300:500], sequence[0][100:300,300:500], 10, 6)
+        np.save(results_save_path + "bandA_" + names[0], sequence[0])
+        np.save(results_save_path + "activation_" + names[0], total)
 
         if 1 == 1:
             h = 2
@@ -272,7 +377,7 @@ for llo in locations:
             axs[0, 3].imshow(dark_pixels, cmap="gray")
             axs[1, 3].imshow(np.ones_like(dark_pixels), cmap="gray")
             axs[0, 4].imshow(total, cmap="gray")
-            axs[1, 4].imshow(np.ones_like(total), cmap="gray")
+            axs[1, 4].imshow(thresh_total, cmap="gray")
             plt.subplots_adjust(wspace=0, hspace=0)
             for row in range(0, 2):
                 for col in range(0, 5):
@@ -280,17 +385,17 @@ for llo in locations:
                     axs[row, col].set_yticklabels([])
             plt.show()
 
+        df_row = [names[0]]
+        band_B_mask = cv2.blur(np.where(sequence_B[0]==0, 5, 0), ksize=(10, 10))
+        band_B_mask = np.where(band_B_mask > 0, 1, 0)
 
+        activation_thresholds[-1] = t_m_t
+        for threshold in activation_thresholds:
+            #Calculate the precision and recall for that threshold
+            p = precision(plume_mask, total, [threshold], zero_mask=band_B_mask)[0]
+            r = recall(plume_mask, total, [threshold], zero_mask=band_B_mask)[0]
+            #Add to the dataframe row
+            df_row = df_row + [p, r]
 
-
-
-
-
-
-
-
-
-
-
-
-
+        #results_df.loc[len(results_df)] = df_row
+    #results_df.to_excel(results_save_path + "PrecisionRecall.xlsx")
