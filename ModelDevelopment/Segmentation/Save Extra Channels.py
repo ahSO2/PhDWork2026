@@ -8,11 +8,7 @@ import VolcDictionaryWithCorrectClears
 from skimage.restoration import denoise_bilateral
 import numpy as np
 
-<<<<<<< HEAD
 dataframe = pd.read_excel("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/CotopaxiLeftOut_Valid.xlsx")
-=======
-dataframe = pd.read_excel("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/CotopaxiLeftOut_Train.xlsx")
->>>>>>> origin/main
 data_source = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2/"
 temporal_data_source = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal/"
 destination = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/InputChannels/woCotopaxi/"
@@ -89,5 +85,3 @@ for sample_index in range(0, dataframe.shape[0]):
 
     np.save(destination + "D_" + image_name_A[:-3] + ".npy", difference)
     np.save(destination + "A_" + image_name_A[:-3] + ".npy", rel_AA)
-
-

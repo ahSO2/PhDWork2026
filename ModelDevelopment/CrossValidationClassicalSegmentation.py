@@ -234,7 +234,7 @@ def superpixels(image, diff, abs, k, comp):
     #print(comp)
     segments_slic = slic(three_channel, n_segments=k, compactness=comp, sigma=1, start_label=1)
     #print(segments_slic.shape)
-    if plot_stuff == 1:
+    if plot_stuff == True:
         fig, ax = plt.subplots(ncols=2)
         ax[0].imshow(segments_slic)
         ax[0].set_title("Superpixels")
@@ -371,11 +371,7 @@ data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentatio
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/SensorMarkMasks/"
 flank_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"
-<<<<<<< HEAD
 mod = 1
-=======
-mod = 10
->>>>>>> origin/main
 save_results = False
 plot_stuff = True
 
@@ -404,7 +400,6 @@ for llo in locations:
 
                 #Now attempt segmentation:
                 sequence = np.array(sequence).astype(np.float32)
-<<<<<<< HEAD
                 #sequence_B = np.array(sequence_B).astype(np.float32)
                 #show(sequence[0] - sequence_B[0])
                 #show(sequence[0])
@@ -412,17 +407,10 @@ for llo in locations:
                 #print(names[1])
                 #show(sequence[1])
                 #masked = np.where(plume_mask==1, 1, sequence[0])
-=======
-                sequence_B = np.array(sequence_B).astype(np.float32)
-                #show(sequence[0] - sequence_B[0])
-                #show(sequence[0])
-                masked = np.where(plume_mask==1, 1, sequence[0])
->>>>>>> origin/main
                 #show(masked)
 
                 #Calculate the difference image
                 #scaled_sequence = normalise_for_ss(sequence, names)
-<<<<<<< HEAD
                 scaled_sequence = normalise_by_max_value(sequence, names)
                 #scaled_sequence_B = normalise_for_ss(sequence_B, names_B)
 
@@ -431,47 +419,26 @@ for llo in locations:
 
                 #unscaled_diff = pixel_diff(sequence[0], sequence[1])
                 #difference = pixel_diff(sequence[0], sequence[1])
-=======
-                #scaled_sequence_B = normalise_for_ss(sequence_B, names_B)
-
-                #show(sequence[0])
-                #show(sequence[1])
-
-                #unscaled_diff = pixel_diff(sequence[0], sequence[1])
-                difference = pixel_diff(sequence[0], sequence[1])
->>>>>>> origin/main
                 #show(difference)
 
                 #Calculate relative absorbance
                 #Take log of bandB/bandA, for the current timestep image
-<<<<<<< HEAD
                 #rel_AA = calc_rel_AA(sequence, sequence_B, flank_mask)
-=======
-                rel_AA = calc_rel_AA(sequence, sequence_B, flank_mask)
->>>>>>> origin/main
                 #show(rel_AA)
 
                 #Goal 1: Select points which are likely to be plume
 
                 #Mask out flank (and a little more!)
-<<<<<<< HEAD
                 #flank_mask = cv2.blur(np.where(flank_mask==0, 5, 0), ksize=(10, 10))
                 #show(flank_mask)
                 #difference = np.where(flank_mask>0, 0, difference)
                 #rel_AA = np.where(flank_mask>0, 0, rel_AA)
-=======
-                flank_mask = cv2.blur(np.where(flank_mask==0, 5, 0), ksize=(10, 10))
-                #show(flank_mask)
-                difference = np.where(flank_mask>0, 0, difference)
-                rel_AA = np.where(flank_mask>0, 0, rel_AA)
->>>>>>> origin/main
                 #show(difference)
                 #show(rel_AA)
 
 
                 #Select points which are moving above the local mean
                 #show(difference)
-<<<<<<< HEAD
                 #difference = denoise_bilateral(difference.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
                 #show(difference)
                 #diff_pts = cv2.adaptiveThreshold(difference.astype("uint8"), maxValue=1, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=21, C=0)
@@ -489,25 +456,6 @@ for llo in locations:
                 #sky_pixels = np.ma.masked_where(flank_mask>0, darkness_img)
                 #dark_ratio = np.divide(sky_pixels, np.ma.max(sky_pixels))
                 #dark_pixels = np.where(flank_mask>0, 0, dark_ratio)
-=======
-                difference = denoise_bilateral(difference.astype("float32"), sigma_color = 5, sigma_spatial = 10, win_size=20)
-                #show(difference)
-                #diff_pts = cv2.adaptiveThreshold(difference.astype("uint8"), maxValue=1, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=21, C=0)
-                d_thresh, d_l_thresh = calc_hist(difference)
-                diff_pts = np.where(difference > d_thresh, 0.5, 0) + np.where(difference > d_l_thresh, 0.5, 0)
-                #show(diff_pts)
-
-                #Select points which are absorbing above local mean
-                AA_threshold, AA_lower_threshold = calc_hist(rel_AA)
-                abs_pts = np.where(rel_AA>AA_threshold, 0.5, 0) + np.where(rel_AA>AA_lower_threshold, 0.5, 0)
-                #show(abs_pts)
-
-                max_val = np.max(sequence[0])
-                darkness_img = max_val + 1 - sequence[0].astype("float32")
-                sky_pixels = np.ma.masked_where(flank_mask>0, darkness_img)
-                dark_ratio = np.divide(sky_pixels, np.ma.max(sky_pixels))
-                dark_pixels = np.where(flank_mask>0, 0, dark_ratio)
->>>>>>> origin/main
                 #show(dark_pixels)
 
                 #denoised_AA = denoise_bilateral(rel_AA.astype("float32"), sigma_color=5, sigma_spatial=10, win_size=20)
@@ -516,7 +464,6 @@ for llo in locations:
                 #IOU = superpixel_IOU(sp, plume_mask, sequence[0])
 
                 #Goal 2: Take those points and
-<<<<<<< HEAD
                 #total = np.multiply(dark_pixels, diff_pts * abs_pts)
 
                 #select_plume(total, sp, plume_mask)
@@ -529,20 +476,6 @@ for llo in locations:
 
                 #show(total)
                 if plot_stuff == 5:
-=======
-                total = np.multiply(dark_pixels, diff_pts * abs_pts)
-
-                #select_plume(total, sp, plume_mask)
-
-                c1 = min_max_scale(sequence[0])
-                c2 = min_max_scale(difference)
-                c3 = min_max_scale(rel_AA)
-                three_channel = np.stack([c1, c2, c3], axis=-1)
-                grabCut(three_channel, total)
-
-                #show(total)
-                if plot_stuff == True:
->>>>>>> origin/main
                     h = 2
                     fig, axs = plt.subplots(ncols=5, nrows=2, figsize=(5 * h, 2 * h * (486/648)))
                     axs[0,0].imshow(masked, cmap="gray")
@@ -590,13 +523,8 @@ for llo in locations:
                 #recalls = recall(plume_mask, total, thresholds)
                 #results_df.loc[len(results_df)] = [names[0], IOU]
 
-<<<<<<< HEAD
             #if save_results == True:
                 #results_df.to_excel(results_save_path + llo + "LeftOutFold_k" + str(k) + "_c" + str(comp) + ".xlsx")
-=======
-            if save_results == True:
-                results_df.to_excel(results_save_path + llo + "LeftOutFold_k" + str(k) + "_c" + str(comp) + ".xlsx")
->>>>>>> origin/main
 
 
 
