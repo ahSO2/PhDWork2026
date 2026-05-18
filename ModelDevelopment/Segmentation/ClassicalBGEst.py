@@ -138,7 +138,7 @@ def calc_rel_AA(sequence, sequence_B, flank_mask):
     # Subtract such that the mean AA over the flank is zero
     rel_AA = np.where(flank_mask == 0, 0, rel_AA)
     return rel_AA
-def precision(plume_mask, activation, thresholds, zero_mask):
+def precision_plume(plume_mask, activation, thresholds, zero_mask):
     '''Calculate the precision of the prediction of plume pixels at given set of threshold vals.'''
     precisions = []
     for threshold in thresholds:
@@ -157,7 +157,26 @@ def precision(plume_mask, activation, thresholds, zero_mask):
         precisions.append(p)
     return precisions
 
-def recall(plume_mask, activation, thresholds, zero_mask):
+def precision_bg(bg_points, activation, thresholds, zero_mask):
+    '''Calculate the precision of the prediction of plume pixels at given set of threshold vals.'''
+    precisions = []
+    for threshold in thresholds:
+        predicted_bg = np.where(activation < threshold, 1, 0)
+        if np.sum(predicted_bg) > 0:
+            if type(zero_mask) is np.ndarray:
+                '''Mask out area where bandB is zero from consideration.'''
+                predicted_bg = np.where(zero_mask > 0, 0, predicted_bg)
+
+            correct_bg = np.where(bg_points>0, predicted_bg, 0)
+            #show(predicted_bg, "predicted_bg")
+            #show(correct_bg, "correct_bg")
+            p = np.sum(correct_bg)/np.sum(predicted_bg)
+        else:
+            p=1
+        precisions.append(p)
+    return precisions
+
+def recall_plume(plume_mask, activation, thresholds, zero_mask):
     '''Calculate which proportion of the plume is identified, given a set of threshold values.'''
     recalls = []
     if type(zero_mask) is np.ndarray:
@@ -169,6 +188,23 @@ def recall(plume_mask, activation, thresholds, zero_mask):
             #show(predicted_plume, "predicted_plume")
             #show(plume_mask, "plume_mask")
             r = np.sum(predicted_plume)/np.sum(plume_mask)
+        else:
+            r = np.nan
+        recalls.append(r)
+    return recalls
+
+def recall_bg(bg_mask, activation, thresholds, zero_mask):
+    '''Calculate which proportion of the plume is identified, given a set of threshold values.'''
+    recalls = []
+    if type(zero_mask) is np.ndarray:
+        bg_mask = np.where(zero_mask > 0, 0, bg_mask)
+    for threshold in thresholds:
+        if np.sum(plume_mask) > 0:
+            predicted_bg = np.where(activation<threshold, 1, 0)
+            predicted_bg = np.where(bg_mask>0, predicted_bg, 0)
+            #show(predicted_bg, "predicted_bg")
+            #show(bg_mask, "bg_mask")
+            r = np.sum(predicted_bg)/np.sum(bg_mask)
         else:
             r = np.nan
         recalls.append(r)
@@ -291,14 +327,14 @@ mod = 1
 
 plot_stuff = True
 #activation_thresholds = [0, 0.05, 0.1, 0.2, 0.3, "adp"]
-#results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/26 - Cross Bilateral Filter/"
-#df_columns = []
+results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/26 - Cross Bilateral Filter/"
+df_columns = ["precision", "recall"]
 #for threshold in activation_thresholds:
 #    df_columns.append("pr_" + str(threshold))
 #    df_columns.append("re_" + str(threshold))
 
 for llo in locations:
-    #results_df = pd.DataFrame(columns=["image_name"] + df_columns)
+    results_df = pd.DataFrame(columns=["image_name"] + df_columns)
     print("Running tests on " + llo + "-left-out CV Fold.")
     train_df = pd.read_excel(df_path + llo + "LeftOut_Train.xlsx")
     train_df = train_df[train_df["overall_obs"] == "No"]
@@ -380,7 +416,7 @@ for llo in locations:
         #np.save(results_save_path + "bandA_" + names[0], sequence[0])
         #np.save(results_save_path + "activation_" + names[0], total)
 
-        if 1 == 1:
+        if 1 == 2:
             h = 2
             fig, axs = plt.subplots(ncols=5, nrows=2, figsize=(5 * h, 2 * h * (486 / 648)))
             axs[0, 0].imshow(sequence[0], cmap="gray")
@@ -416,7 +452,15 @@ for llo in locations:
         df_row = [names[0]]
         band_B_mask = cv2.blur(np.where(sequence_B[0]==0, 5, 0), ksize=(10, 10))
         band_B_mask = np.where(band_B_mask > 0, 1, 0)
+        to_mask_out = np.where(np.logical_or(band_B_mask > 0, flank_mask>0), 1, 0)
+        #show(to_mask_out)
 
+        activation_thresholds = [t_m_t]
+        p = precision_bg(np.where(plume_mask == 1, 0, 1), filtered_total, activation_thresholds, zero_mask=to_mask_out)[0]
+        r = recall_bg(np.where(plume_mask == 1, 0, 1 ), filtered_total, activation_thresholds, zero_mask=to_mask_out)[0]
+        df_row = [names[0], p, r]
+        print(p)
+        print(r)
         #activation_thresholds[-1] = t_m_t
         #for threshold in activation_thresholds:
             #Calculate the precision and recall for that threshold
@@ -425,5 +469,5 @@ for llo in locations:
             #Add to the dataframe row
             #df_row = df_row + [p, r]
 
-        #results_df.loc[len(results_df)] = df_row
-    #results_df.to_excel(results_save_path + "PrecisionRecall.xlsx")
+        results_df.loc[len(results_df)] = df_row
+    results_df.to_excel(results_save_path + "PrecisionRecall.xlsx")
