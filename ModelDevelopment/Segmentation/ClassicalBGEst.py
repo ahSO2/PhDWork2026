@@ -190,6 +190,7 @@ def calc_hist(image, plot, peak_index=-1):
 
 
     if plot == True:
+        show(image)
         fit = np.polyfit(bin_centers, counts, deg=10)
         p = np.poly1d(fit)
         plt.stairs(counts, bins)
@@ -286,7 +287,7 @@ data_path_temporal = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentatio
 segmentation_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/SensorMarkMasks/"
 flank_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"
-mod = 7
+mod = 1
 
 plot_stuff = True
 #activation_thresholds = [0, 0.05, 0.1, 0.2, 0.3, "adp"]
@@ -355,10 +356,10 @@ for llo in locations:
         dark_pixels = np.where(flank_mask>0, 0, dark_ratio)
 
         #total = np.multiply(dark_pixels, diff_pts * abs_pts)
-        #total = np.multiply(diff_pts + abs_pts, dark_pixels)
+        total = np.multiply(diff_pts + abs_pts, dark_pixels)
         #show(total)
         t_u_t, t_m_t, t_l_t = calc_hist(total, plot=False, peak_index=0)
-        thresh_total = np.where(total>= t_m_t, total, 0)
+        #thresh_total = np.where(total>= t_m_t, total, 0)
         #compare_hist(plume_mask, total)
 
         #show(sequence[0][0:5, 0:5])
@@ -366,7 +367,9 @@ for llo in locations:
         #show(total)
         #show(sequence[0])
         #filtered_total = cross_bilateral_filter_fast(total * 100, sequence[0], sigma_s=50, sigma_r=40, sa_s=10, sa_r=5)
-        #filtered_total = cross_bilateral_filter_fast(filtered_total, sequence[0], sigma_s=20, sigma_r=40, sa_s=5, sa_r=8)
+        filtered_total = cross_bilateral_filter_fast(total * 100, sequence[0], sigma_s=30, sigma_r=30, sa_s=6, sa_r=6)
+        filtered_total = filtered_total / 100
+        thresh_filtered = np.where(filtered_total > t_m_t, 0, sequence[0])
         #show(filtered_total)
         #fig, axs = plt.subplots(ncols=4)
         #axs[0].imshow(sequence[0], cmap="gray")
@@ -380,22 +383,35 @@ for llo in locations:
         if 1 == 1:
             h = 2
             fig, axs = plt.subplots(ncols=5, nrows=2, figsize=(5 * h, 2 * h * (486 / 648)))
-            axs[0, 0].imshow(masked, cmap="gray")
-            axs[1, 0].imshow(sequence[0], cmap="gray")
+            axs[0, 0].imshow(sequence[0], cmap="gray")
+            axs[0, 0].set_title("Original 310nm", fontsize=10)
+            axs[1, 0].imshow(masked, cmap="gray")
+            axs[1, 0].set_xlabel("My label")
             axs[0, 1].imshow(double_scaled_difference, cmap="gray")
+            axs[0, 1].set_title("Frame-to-frame difference", fontsize=7)
             axs[1, 1].imshow(diff_pts, cmap="gray")
-            axs[0, 2].imshow(rel_AA, cmap="gray")
+            axs[1, 1].set_xlabel("Diff thresholded")
+            axs[0, 2].imshow(rel_AA, cmap="gray", )
+            axs[0, 2].set_title("Est. absorbance", fontsize=10)
             axs[1, 2].imshow(abs_pts, cmap="gray")
+            axs[1, 2].set_xlabel("Absorbance thresholded")
             axs[0, 3].imshow(dark_pixels, cmap="gray")
-            axs[1, 3].imshow(np.ones_like(dark_pixels), cmap="gray")
-            axs[0, 4].imshow(total, cmap="gray")
-            axs[1, 4].imshow(thresh_total, cmap="gray")
+            axs[0, 3].set_title("Darkness", fontsize=10)
+            axs[1, 3].imshow(total, cmap="YlGnBu_r")
+            axs[1, 3].set_xlabel("Activation")
+            plot7 = axs[0, 4].imshow(thresh_filtered, cmap="gray")
+            axs[0, 4].set_title("Selected BG Pixels", fontsize=10)
+            plot8 = axs[1, 4].imshow(filtered_total, cmap="YlGnBu_r",vmax=np.max(total), vmin=np.min(total))
+            axs[1, 4].set_xlabel("Filtered activation")
             plt.subplots_adjust(wspace=0, hspace=0)
             for row in range(0, 2):
                 for col in range(0, 5):
                     axs[row, col].set_xticklabels([])
                     axs[row, col].set_yticklabels([])
+            #fig.colorbar(plot8, ax=[axs[1,4], axs[0, 3]])
             plt.show()
+            #plt.savefig(results_save_path + names[0][:-4] + "_BGRegionPrediction.png", dpi=200)
+            #plt.close()
 
         df_row = [names[0]]
         band_B_mask = cv2.blur(np.where(sequence_B[0]==0, 5, 0), ksize=(10, 10))
