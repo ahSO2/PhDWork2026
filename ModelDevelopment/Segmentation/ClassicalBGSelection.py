@@ -313,7 +313,6 @@ def cross_bilateral_filter_bf(to_smooth, edge_image, sigma_s, sigma_r):
     axs[2].set_title("Smoothed")
     plt.show()
 
-
 locations = ["Cotopaxi"]
 df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/"
 timesteps = ["image_name", "next_tensec_name"]
@@ -327,14 +326,14 @@ mod = 1
 
 plot_stuff = True
 #activation_thresholds = [0, 0.05, 0.1, 0.2, 0.3, "adp"]
-results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/26 - Cross Bilateral Filter/"
-df_columns = ["precision", "recall"]
+#results_save_path = "C:/Users/ggp24ash/Documents/Scratch Data/CrossValidFoldSegmentation/27 - Cross Bilateral Filter on Low Quality/"
+#df_columns = ["precision", "recall"]
 #for threshold in activation_thresholds:
 #    df_columns.append("pr_" + str(threshold))
 #    df_columns.append("re_" + str(threshold))
 
 for llo in locations:
-    results_df = pd.DataFrame(columns=["image_name"] + df_columns)
+    #results_df = pd.DataFrame(columns=["image_name"] + df_columns)
     print("Running tests on " + llo + "-left-out CV Fold.")
     train_df = pd.read_excel(df_path + llo + "LeftOut_Train.xlsx")
     train_df = train_df[train_df["overall_obs"] == "No"]
@@ -406,6 +405,7 @@ for llo in locations:
         filtered_total = cross_bilateral_filter_fast(total * 100, sequence[0], sigma_s=30, sigma_r=30, sa_s=6, sa_r=6)
         filtered_total = filtered_total / 100
         thresh_filtered = np.where(filtered_total > t_m_t, 0, sequence[0])
+        bg_mask = np.where(filtered_total > t_m_t, 1, 0)
         #show(filtered_total)
         #fig, axs = plt.subplots(ncols=4)
         #axs[0].imshow(sequence[0], cmap="gray")
@@ -459,8 +459,7 @@ for llo in locations:
         p = precision_bg(np.where(plume_mask == 1, 0, 1), filtered_total, activation_thresholds, zero_mask=to_mask_out)[0]
         r = recall_bg(np.where(plume_mask == 1, 0, 1 ), filtered_total, activation_thresholds, zero_mask=to_mask_out)[0]
         df_row = [names[0], p, r]
-        print(p)
-        print(r)
+
         #activation_thresholds[-1] = t_m_t
         #for threshold in activation_thresholds:
             #Calculate the precision and recall for that threshold
@@ -469,5 +468,11 @@ for llo in locations:
             #Add to the dataframe row
             #df_row = df_row + [p, r]
 
-        results_df.loc[len(results_df)] = df_row
-    results_df.to_excel(results_save_path + "PrecisionRecall.xlsx")
+        #Check what proportion of the sky is selected as background:
+        plume_masked = np.ma.masked_where(np.logical_or(filtered_total > t_m_t, to_mask_out > 0), rel_AA)
+
+
+        #results_df.loc[len(results_df)] = df_row
+    #results_df.to_excel(results_save_path + "PrecisionRecall.xlsx")
+
+
