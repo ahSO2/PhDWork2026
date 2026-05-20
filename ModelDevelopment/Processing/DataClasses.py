@@ -2,6 +2,9 @@ import cv2
 from datetime import datetime, timedelta
 import os
 
+import numpy as np
+
+
 def map_image_name_to_time(image_name):
     date_str = image_name.split("_")[0][0:10]
     time_str = image_name.split("_")[0][11:17]
@@ -10,6 +13,37 @@ def map_image_name_to_time(image_name):
 
 def shutter_speed_from_band_img_name(image_name):
     return int(image_name.split("_")[3][:-2])
+
+def mask_sensor_marks(image, mask):
+    image = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
+    return image
+
+def correct_sample(bandA, bandB, dark_name_A, dark_name_B, vin_mask_A, vin_mask_B, reg_trans, smm_A, smm_B):
+    '''Apply corrections to the image pair with this index (in the whole sequence).'''
+
+    #Dark subtract
+    dark_img_A = cv2.imread(dark_name_A, -1)
+    dark_img_B = cv2.imread(dark_name_B, -1)
+    bandA = bandA.astype(np.float32) - dark_img_A
+    bandB = bandB.astype(np.float32) - dark_img_B
+
+    print(bandA.dtype)
+
+    # Vignette correct
+    bandA = np.divide(bandA, vin_mask_A)
+    bandB = np.divide(bandB, vin_mask_B)
+
+    #Register bandB
+    bandB = cv2.warpPerspective(bandB, reg_trans, (bandB.shape[1], bandB.shape[0]))
+
+    # Mask sensor marks where applicable
+    if isinstance(smm_A, np.ndarray):
+        bandA = mask_sensor_marks(bandA, smm_A)
+    if isinstance(smm_B, np.ndarray):
+        bandB = mask_sensor_marks(bandB, smm_B)
+
+    return bandA, bandB
+
 class Sequence():
     '''Class representing a sequence of data to be processed.'''
     def __init__(self):
@@ -123,12 +157,22 @@ class Sequence():
             self.clear_path_A = self.volc_dict["clear_sky_path_A"]
             self.clear_path_B = self.volc_dict["clear_sky_path_B"]
 
+
             #Registration transform:
             self.reg_trans_matrix = cv2.getPerspectiveTransform(self.volc_dict['registration_points_B'], self.volc_dict['registration_points_A'])
 
             #Masks for permanent marks on sensor to be infilled
             self.sensor_mark_mask_path_A = self.volc_dict["sensor_marks_mask_A"]
             self.sensor_mark_mask_path_B = self.volc_dict["sensor_marks_mask_A"]
+            if self.sensor_mark_mask_path_A != "None":
+                self.smm_A = cv2.imread(self.sensor_mark_mask_path_A)
+            else:
+                self.smm_A = None
+            if self.sensor_mark_mask_path_B != "None":
+                self.smm_B = cv2.imread(self.sensor_mark_mask_path_B)
+            else:
+                self.smm_B = None
+
         else:
             print("NOTE: No corrections are being applied to this image sequence.")
 
@@ -179,14 +223,54 @@ class Sequence():
             self.batch_bandA.append(cv2.imread(self.image_directory + "/" + self.bandA_names[self.chunk_indicies[-1]], -1))
             self.batch_bandB.append(cv2.imread(self.image_directory + "/" + self.bandB_names[self.chunk_indicies[-1]], -1))
 
-        if b == 0:
-            #Correct all the samples
-        else:
-            #Correct just the last sample
-        #TODO correct the samples (all of the first batch, then just the additional one read in each step).
+        if self.correct == True:
+            if b == 0:
+                #Calculate the vignette masks
+                print("Creating vignette masks.")
+                clear_img_A = cv2.imread(self.clear_path_A, -1).astype(np.float32)
+                self.vin_mask_A = np.divide(clear_img_A, np.max(clear_img_A))
+                clear_img_B = cv2.imread(self.clear_path_B, -1).astype(np.float32)
+                self.vin_mask_B = np.divide(clear_img_B, np.max(clear_img_B))
 
-    def correct_sample(self, sample_index):
-        '''Apply corrections to the image pair with this index (in the whole sequence).'''
-        pass
+                for pair_index in self.chunk_indicies:
+                    original_A_to_plot = self.batch_bandA[pair_index].copy()
+                    original_B_to_plot = self.batch_bandB[pair_index].copy()
+                    self.batch_bandA[pair_index], self.batch_bandB[pair_index] = correct_sample(bandA = self.batch_bandA[pair_index],
+                                                                                                bandB = self.batch_bandB[pair_index],
+                                                                                                dark_name_A = self.dark_path_A + "/" + self.matched_dark_names_A[pair_index],
+                                                                                                dark_name_B = self.dark_path_B + "/" + self.matched_dark_names_B[pair_index],
+                                                                                                vin_mask_A = self.vin_mask_A,
+                                                                                                vin_mask_B = self.vin_mask_B,
+                                                                                                reg_trans = self.reg_trans_matrix,
+                                                                                                smm_A = self.smm_A,
+                                                                                                smm_B = self.smm_B)
+
+
+                    fig, axs = plt.subplots(ncols=2, nrows=2)
+                    axs[0,0].imshow(original_A_to_plot, cmap="gray")
+                    axs[0, 1].imshow(original_B_to_plot, cmap="gray")
+                    axs[1, 0].imshow(self.batch_bandA[pair_index], cmap="gray")
+                    axs[1, 1].imshow(self.batch_bandB[pair_index], cmap="gray")
+
+            else:
+                #Correct just the last sample
+                index_to_correct = self.chunk_indicies[-1]
+                self.batch_bandA[index_to_correct], self.batch_bandB[index_to_correct] = correct_sample(bandA=self.batch_bandA[index_to_correct],
+                                                                                                        bandB=self.batch_bandB[index_to_correct],
+                                                                                                        dark_name_A= self.dark_path_A + "/" + self.matched_dark_names_A[index_to_correct],
+                                                                                                        dark_name_B= self.dark_path_B + "/" + self.matched_dark_names_B[pair_index],
+                                                                                                        vin_mask_A=self.vin_mask_A,
+                                                                                                        vin_mask_B=self.vin_mask_B,
+                                                                                                        reg_trans=self.reg_trans_matrix,
+                                                                                                        smm_A=self.smm_A,
+                                                                                                        smm_B=self.smm_B)
+
+
+
+
+
+
+
+
 
 

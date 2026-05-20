@@ -18,5 +18,6 @@ Reventador_2022_dictionary = {"volcano_dictionary_name":"Reventador2022",
 reventador_sequence = Sequence()
 reventador_sequence.set_volcano_dictionary(Reventador_2022_dictionary)
 reventador_sequence.read_and_match("D:/Reventador/2022/2022-04-24/Seq_2")
-reventador_sequence.iterate(b=0)
-reventador_sequence.iterate(b=1)
+mins = 5
+reventador_sequence.iterate(b=0, chunk_size_m=mins)
+reventador_sequence.iterate(b=1, chunk_size_m=mins)
