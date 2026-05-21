@@ -1,11 +1,11 @@
 import os
 import cv2
 import numpy as np
-#for image_name in os.listdir("10bitImgs"):
-#    image = cv2.imread("10bitImgs/" + image_name, -1)
+#for image_name in os.listdir("10bitImgs2"):
+#    image = cv2.imread("10bitImgs2/" + image_name, -1)
 #    image = (image/4).astype("uint8")
 #    image = image + 30
-#    cv2.imwrite("UINT8/" + image_name, image)
+#    cv2.imwrite("UINT82/" + image_name, image)
 
 
 #Next, convert the flank masks to numpy:
@@ -86,5 +86,5 @@ def convert_json_labels(folder_name):
         cv2.imwrite(save_path + "FlankPixels_" + json_file.split(".")[0] + ".png", pixel_masks)
 
 
-convert_json_labels("RawMasks")
+convert_json_labels("RawMasks2")
 

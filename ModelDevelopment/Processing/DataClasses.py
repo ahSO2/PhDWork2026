@@ -1,8 +1,15 @@
+from BackgroundMethods import *
 import cv2
 from datetime import datetime, timedelta
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
+
+def show(image, cmap="gray"):
+    plt.imshow(image, cmap=cmap)
+    plt.colorbar()
+    plt.show()
 
 
 def map_image_name_to_time(image_name):
@@ -15,7 +22,13 @@ def shutter_speed_from_band_img_name(image_name):
     return int(image_name.split("_")[3][:-2])
 
 def mask_sensor_marks(image, mask):
-    image = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
+    '''Take in a float image, create an 8-bit copy, and calculate the masked values.
+    Infill the folat image using these claculated values.'''
+    scale_factor = 255/np.max(image)
+    image_8bit = (image * scale_factor).astype(np.uint8)
+    infilled_8bit = cv2.inpaint(image_8bit, mask, 5, cv2.INPAINT_TELEA)
+    infilled_rescaled = infilled_8bit / scale_factor
+    image = np.where(mask > 0, infilled_rescaled, image)
     return image
 
 def correct_sample(bandA, bandB, dark_name_A, dark_name_B, vin_mask_A, vin_mask_B, reg_trans, smm_A, smm_B):
@@ -27,7 +40,6 @@ def correct_sample(bandA, bandB, dark_name_A, dark_name_B, vin_mask_A, vin_mask_
     bandA = bandA.astype(np.float32) - dark_img_A
     bandB = bandB.astype(np.float32) - dark_img_B
 
-    print(bandA.dtype)
 
     # Vignette correct
     bandA = np.divide(bandA, vin_mask_A)
@@ -51,6 +63,8 @@ class Sequence():
         self.previous_indicies = []
         self.batch_bandA = []
         self.batch_bandB = []
+        self.bgs_A = []
+        self.bgs_B = []
 
 
     def set_volcano_dictionary(self, dictionary):
@@ -125,7 +139,7 @@ class Sequence():
             self.matched_dark_names_B = []
             pairs_to_remove = []
             for pair_index in range(0, len(self.bandA_names)):
-                print(pair_index)
+
                 band_A_ss = round(shutter_speed_from_band_img_name(self.bandA_names[pair_index]), self.dark_sig_figs)
                 band_B_ss = round(shutter_speed_from_band_img_name(self.bandB_names[pair_index]), self.dark_sig_figs)
                 matching_dark_A = False
@@ -165,13 +179,14 @@ class Sequence():
             self.sensor_mark_mask_path_A = self.volc_dict["sensor_marks_mask_A"]
             self.sensor_mark_mask_path_B = self.volc_dict["sensor_marks_mask_A"]
             if self.sensor_mark_mask_path_A != "None":
-                self.smm_A = cv2.imread(self.sensor_mark_mask_path_A)
+                self.smm_A = cv2.imread(self.sensor_mark_mask_path_A, -1)
             else:
                 self.smm_A = None
             if self.sensor_mark_mask_path_B != "None":
-                self.smm_B = cv2.imread(self.sensor_mark_mask_path_B)
+                self.smm_B = cv2.imread(self.sensor_mark_mask_path_B, -1)
             else:
                 self.smm_B = None
+
 
         else:
             print("NOTE: No corrections are being applied to this image sequence.")
@@ -191,10 +206,14 @@ class Sequence():
         #For b = 0, load the first 30mins of data
 
         if b == 0:
+            print("Loading batch zero:")
             self.batch_start_time = self.times[0]
             self.batch_end_time = self.batch_start_time + timedelta(minutes=chunk_size_m)
             #Now select indicies of the "times" list which are in [start, end]
             self.chunk_indicies = [i for i in range(len(self.times)) if self.times[i] <= self.batch_end_time]
+
+            self.flank_mask = cv2.imread(self.volc_dict["flank_mask_path"], -1)
+            show(self.flank_mask)
 
         else:
             #For every batch after, step forward by one image, and select the previous 30mins of recordings
@@ -206,14 +225,14 @@ class Sequence():
         #Correct them (dark, clear and registration)
         if b==0:
             for index_to_read in self.chunk_indicies:
-                print(index_to_read)
-                print("Reading image:" + str(self.bandA_names[index_to_read]))
+                #print(index_to_read)
+                #print("Reading image:" + str(self.bandA_names[index_to_read]))
                 bandA = cv2.imread(self.image_directory + "/" + self.bandA_names[index_to_read], -1)
                 bandB = cv2.imread(self.image_directory + "/" + self.bandB_names[index_to_read], -1)
                 self.batch_bandA.append(bandA)
                 self.batch_bandB.append(bandB)
         else:
-            print("Iterating batch by one image:")
+            print("Moving batch forward by one image.")
 
             overlapping_batch_indicies = [self.chunk_indicies[i] for i in range(0, len(self.chunk_indicies)) if (self.chunk_indicies[i] in self.previous_indicies)]
             #Select the relevant samples which are already read in
@@ -233,6 +252,7 @@ class Sequence():
                 self.vin_mask_B = np.divide(clear_img_B, np.max(clear_img_B))
 
                 for pair_index in self.chunk_indicies:
+
                     original_A_to_plot = self.batch_bandA[pair_index].copy()
                     original_B_to_plot = self.batch_bandB[pair_index].copy()
                     self.batch_bandA[pair_index], self.batch_bandB[pair_index] = correct_sample(bandA = self.batch_bandA[pair_index],
@@ -242,28 +262,61 @@ class Sequence():
                                                                                                 vin_mask_A = self.vin_mask_A,
                                                                                                 vin_mask_B = self.vin_mask_B,
                                                                                                 reg_trans = self.reg_trans_matrix,
-                                                                                                smm_A = self.smm_A,
-                                                                                                smm_B = self.smm_B)
+                                                                                                smm_A=self.smm_A,
+                                                                                                smm_B=self.smm_B)
 
-
-                    fig, axs = plt.subplots(ncols=2, nrows=2)
-                    axs[0,0].imshow(original_A_to_plot, cmap="gray")
-                    axs[0, 1].imshow(original_B_to_plot, cmap="gray")
-                    axs[1, 0].imshow(self.batch_bandA[pair_index], cmap="gray")
-                    axs[1, 1].imshow(self.batch_bandB[pair_index], cmap="gray")
 
             else:
                 #Correct just the last sample
-                index_to_correct = self.chunk_indicies[-1]
-                self.batch_bandA[index_to_correct], self.batch_bandB[index_to_correct] = correct_sample(bandA=self.batch_bandA[index_to_correct],
-                                                                                                        bandB=self.batch_bandB[index_to_correct],
-                                                                                                        dark_name_A= self.dark_path_A + "/" + self.matched_dark_names_A[index_to_correct],
-                                                                                                        dark_name_B= self.dark_path_B + "/" + self.matched_dark_names_B[pair_index],
-                                                                                                        vin_mask_A=self.vin_mask_A,
-                                                                                                        vin_mask_B=self.vin_mask_B,
-                                                                                                        reg_trans=self.reg_trans_matrix,
+                self.batch_bandA[-1], self.batch_bandB[-1] = correct_sample(bandA=self.batch_bandA[-1],
+                                                                                                        bandB=self.batch_bandB[-1],
+                                                                                                        dark_name_A = self.dark_path_A + "/" + self.matched_dark_names_A[-1],
+                                                                                                        dark_name_B = self.dark_path_B + "/" + self.matched_dark_names_B[-1],
+                                                                                                        vin_mask_A = self.vin_mask_A,
+                                                                                                        vin_mask_B = self.vin_mask_B,
+                                                                                                        reg_trans = self.reg_trans_matrix,
                                                                                                         smm_A=self.smm_A,
                                                                                                         smm_B=self.smm_B)
+        remaining_iterations = len(self.bandA_names) - 1 - self.chunk_indicies[-1]
+        return self.batch_bandA, self.batch_bandB, remaining_iterations
+    def estimate_backgrounds(self, method, b):
+        '''For the current batch of data which has been read by calling the
+        "iterate" method and is stored as self.batch_bandA/B, calculate the
+        background estimations for every image, using the specified method.'''
+        if b == 0:
+            #Then need to estimate backgrounds for the whole first batch
+            for background_index in range(0, len(self.chunk_indicies)):
+
+                bgA, bgB = method(self.batch_bandA[background_index], self.batch_bandB[background_index], self.flank_mask)
+                self.bgs_A.append(bgA)
+                self.bgs_B.append(bgB)
+
+        else:
+            #Calculate and append the background estimation for the new image
+            bgA_new, bgB_new = method(self.batch_bandA[-1], self.batch_bandB[-1], self.flank_mask)
+            self.bgs_A.append(bgA_new)
+            self.bgs_B.append(bgB_new)
+
+            #Drop any extra background values from the start of the list
+            extra_count = len(self.bgs_A) - len(self.batch_bandA)
+            if extra_count > 0:
+                self.bgs_A = self.bgs_A[extra_count:]
+                self.bgs_B = self.bgs_B[extra_count:]
+            #TODO check this is working as intended
+
+        def calculate_absorbance(self, b):
+            #TODO
+            '''Calculate the absorbance for the current batch of data.'''
+            #If batch is zero, calculate for whole batch,
+            #If batch is 1, calculate just for the last image
+            pass
+
+        def translate_absorbance(self):
+            #TODO
+            '''Calibrate the absorbance images such that the median in a specific region
+            e.g. the flank is zero, using simple subtraction.'''
+            pass
+
 
 
 
