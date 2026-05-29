@@ -3,3 +3,17 @@
 /StandardScripts/DataToView/
 /Figures/Data/
 /ModelDevelopment/Segmentation/RoughResults/Model.pth
+/ModelDevelopment/Processing/__pycache__/
+QualityIndexThings/Calibration/RegressionSmallCVFoldTest/Model133_woCotTest_ReliabilityDiagram.png
+
+QualityIndexThings/FinalModelOutputs/Precipitation_Full_TestSeen_ImageNamesWithModelPredictions.xlsx
+
+QualityIndexThings/FinalModelOutputs/Cloud_Full_TestSeen_ImageNamesWithModelPredictions.xlsx
+
+QualityIndexThings/Calibration/ReliabilityDiagram_Precipitation_Full_TestSeen.png
+
+QualityIndexThings/Calibration/ReliabilityDiagram_Cloud_Full_TestSeen.png
+
+QualityIndexThings/__pycache__/
+
+QualityIndexThings/Calibration/RegressionSmallCVFoldTest/Model133_woCotValid_ReliabilityDiagram.png
