@@ -108,7 +108,7 @@ for chunk in range(1, n_chunks + 1):
     print("Time for application to chunk: " + str(np.round(application_time, 2)) + "s")
 
 #Write out the predictions as columns of the image names dataframe
-image_names_df["precipiation_prediction"] = all_precip_predictions
+image_names_df["precipitation_prediction"] = all_precip_predictions
 image_names_df["cloud_prediction"] = all_cloud_predictions
 image_names_df.to_excel(outputs_save_path + image_names_path.split("/")[-1][:-4] + ".xlsx")
 
