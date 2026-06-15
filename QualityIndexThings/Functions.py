@@ -31,6 +31,19 @@ def get_pretrained_resnet18_model_only():
     for param in model.parameters():
         param.requires_grad = False
     return model
+
+def get_single_branched_resnet18(device):
+    model = models.resnet18(weights="IMAGENET1K_V1")
+    for param in model.parameters():
+        param.requires_grad = False
+    model.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+    model.fc = nn.Sequential(nn.Flatten(),
+                             nn.Linear(512, 64),
+                             nn.ReLU(),
+                             nn.Dropout(0.2),
+                             nn.Linear(64, 1),
+                             nn.Sigmoid())
+    return model.to(device)
 class TripleBranchedModel(torch.nn.Module):
     def __init__(self):
         super(TripleBranchedModel, self).__init__()
@@ -140,87 +153,82 @@ def mask_sensor_marks(image, mask_path, data_path):
         mask = cv2.imread(data_path + mask_path, -1)
         image = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
     return image
-def read_data(labels, timesteps_for_precip, timesteps_for_cloud, data_path, do_mask_sensor_marks, sensor_mark_data_path, precip_is_labelled=False, cloud_is_labelled=False):
-    x_precip = []
-    x_cloud = []
-
+def read_data(labels, timesteps, data_path, additional_data_path, do_mask_sensor_marks, sensor_mark_data_path, precip_is_labelled=False, cloud_is_labelled=False):
+    X = []
     for index in range(0, labels.shape[0]):
         # Array to store data for this sample.
         # [observation_index][timestep_index, channel, 486, 648]
-        this_obs_x_precip = np.empty((3, 3, 486, 648))
-        this_obs_x_cloud = np.empty((3, 3, 486, 648))
+        if len(timesteps) > 1:
+            this_obs_x = np.empty((len(timesteps), 3, 486, 648))
+        else:
+            this_obs_x = np.empty((3, 486, 648))
 
         dictionary_name = labels['volcano_dictionary_name'][index]
         volcano_dictionary = VolcanoesDictionaryForQualityModels.map_dictionary_name_to_dictionary(dictionary_name)
         sensor_mask_name_A = volcano_dictionary["sensor_marks_mask_A"]
         sensor_mask_name_B = volcano_dictionary["sensor_marks_mask_B"]
 
+        if "labelled" in labels.columns:
+            if labels["labelled"][index] == "Original":
+                path_to_read = data_path
+            else:
+                path_to_read = additional_data_path
+        else:
+            path_to_read = data_path
+
         timestep_index = 0
-        for precip_timestep_name in timesteps_for_precip:
-            image_name_A = labels[precip_timestep_name][index]
-            image_name_B = labels[precip_timestep_name + "_B"][index]
-            image_A = cv2.imread(data_path + "/" + image_name_A, -1)
-            image_B = cv2.imread(data_path + "/" + image_name_B, -1)
+        for timestep_name in timesteps:
+            image_name_A = labels[timestep_name][index]
+            image_name_B = labels[timestep_name + "_B"][index]
+            image_A = cv2.imread(path_to_read + "/" + image_name_A, -1)
+            image_B = cv2.imread(path_to_read + "/" + image_name_B, -1)
 
             # Mask for sensor marks
             if do_mask_sensor_marks == True:
                 image_A = mask_sensor_marks(image_A, sensor_mask_name_A, sensor_mark_data_path)
                 image_B = mask_sensor_marks(image_B, sensor_mask_name_B, sensor_mark_data_path)
 
-            this_obs_x_precip[timestep_index, 0, :, :] = image_A
-            this_obs_x_precip[timestep_index, 1, :, :] = image_B
-            this_obs_x_precip[timestep_index, 2, :, :] = np.zeros_like(image_A)
+            if len(timesteps) > 1:
+                this_obs_x[timestep_index, 0, :, :] = image_A
+                this_obs_x[timestep_index, 1, :, :] = image_B
+                this_obs_x[timestep_index, 2, :, :] = np.zeros_like(image_A)
+            else:
+                this_obs_x[0, :, :] = image_A
+                this_obs_x[1, :, :] = image_B
+                this_obs_x[2, :, :] = np.zeros_like(image_A)
             timestep_index += 1
-
-        timestep_index = 0
-        for cloud_timestep_name in timesteps_for_cloud:
-            image_name_A = labels[cloud_timestep_name][index]
-            image_name_B = labels[cloud_timestep_name + "_B"][index]
-            image_A = cv2.imread(data_path + "/" + image_name_A, -1)
-            image_B = cv2.imread(data_path + "/" + image_name_B, -1)
-
-            # Mask for sensor marks
-            if do_mask_sensor_marks == True:
-                image_A = mask_sensor_marks(image_A, sensor_mask_name_A, sensor_mark_data_path)
-                image_B = mask_sensor_marks(image_B, sensor_mask_name_B, sensor_mark_data_path)
-
-            this_obs_x_cloud[timestep_index, 0, :, :] = image_A
-            this_obs_x_cloud[timestep_index, 1, :, :] = image_B
-            this_obs_x_cloud[timestep_index, 2, :, :] = np.zeros_like(image_A)
-            timestep_index += 1
-
-        x_precip.append(this_obs_x_precip)
-        x_cloud.append(this_obs_x_cloud)
-    return x_precip, x_cloud
+        X.append(this_obs_x)
+    return X
 class ImageLoader(Dataset):
-    def __init__(self, labels, timesteps_for_precip, timesteps_for_cloud, data_path, device, do_mask_sensor_marks=True, sensor_mark_masks_path=None):
+    def __init__(self, labels, timesteps, data_path, additional_data_path, device, do_mask_sensor_marks=True, sensor_mark_masks_path=None):
 
-        x_precip, x_cloud= read_data(labels, timesteps_for_precip=timesteps_for_precip, timesteps_for_cloud=timesteps_for_cloud, data_path=data_path, do_mask_sensor_marks=do_mask_sensor_marks, sensor_mark_data_path=sensor_mark_masks_path)
+        X = read_data(labels, timesteps=timesteps, data_path=data_path, additional_data_path=additional_data_path, do_mask_sensor_marks=do_mask_sensor_marks, sensor_mark_data_path=sensor_mark_masks_path)
 
-        self.n_timesteps = 3
-        self.X_P = torch.tensor(np.array(x_precip)).float()
-        self.X_C = torch.tensor(np.array(x_cloud)).float()
+        self.n_timesteps = len(timesteps)
+        self.X = torch.tensor(np.array(X)).float()
 
         self.device = device
     def __len__(self):
         # Return number of input observations
-        return len(self.X_P)
+        return len(self.X)
 
     def __getitem__(self, index):
-        return self.X_P[index].to(self.device), self.X_C[index].to(self.device)
+        return self.X[index].to(self.device)
 
-def scale_and_normalise_image(observation, device):
+def scale_and_normalise_image(observation, n_timesteps, device):
     '''Scale to [0,1], then normaise using ImageNet norm.'''
-    n_timesteps = observation.shape[0]
     observation = observation / 1023
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    for timestep in range(0, n_timesteps):
-        norm_X_t = normalize(observation[timestep,:,:,:])
-        observation[timestep,:,:,:] = norm_X_t
+    if n_timesteps > 1:
+        for timestep in range(0, n_timesteps):
+            norm_X_t = normalize(observation[timestep,:,:,:])
+            observation[timestep,:,:,:] = norm_X_t
+    else:
+        norm_X_t = normalize(observation)
+        observation = norm_X_t
     return observation.to(device)
-def scale_and_norm_batch(x, device):
+def scale_and_norm_batch(x, n_timesteps, device):
     output_x = x.clone()
     for observation_index in range(0, x.shape[0]):
-        output_x[observation_index] = scale_and_normalise_image(x[observation_index], device)
+        output_x[observation_index] = scale_and_normalise_image(x[observation_index], n_timesteps, device)
     return output_x

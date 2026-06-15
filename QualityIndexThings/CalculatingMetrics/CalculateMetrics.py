@@ -1,5 +1,7 @@
-import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from sklearn.metrics import precision_recall_curve, auc
 
 def map_YN_to_binary(value):
     if value == "Yes":
@@ -34,7 +36,7 @@ def balanced_accuracy(dataframe):
     #Check there are actually two classes
     classes = dataframe["targets"].unique()
     if classes.shape[0] == 1: #In case this sample only contains one class
-        return np.mean(classes)
+        return np.mean(dataframe["correct"])
     else:
         class_0_samples = dataframe[dataframe["targets"]==0]
         class_1_samples = dataframe[dataframe["targets"]==1]
@@ -101,39 +103,86 @@ def F1_Score(target, predicted):
     outputs["targets"] = target
     outputs["predicted"] = predicted
 
+    return_nan = False
+
     #Calculate precision
     predicted_unobs = outputs[outputs["predicted"]==0]
     correctly_predicted_unobs = predicted_unobs[predicted_unobs["targets"]==0]
-    p = correctly_predicted_unobs.shape[0]/predicted_unobs.shape[0]
+    if predicted_unobs.shape[0] == 0:
+        p = 1
+    else:
+        p = correctly_predicted_unobs.shape[0]/predicted_unobs.shape[0]
 
     #Calculate recall
     true_unobs = outputs[outputs["targets"]==0]
-    r = correctly_predicted_unobs.shape[0]/true_unobs.shape[0]
+    if true_unobs.shape[0] == 0:
+        return_nan = True
+        r = 0
+    else:
+        r = correctly_predicted_unobs.shape[0]/true_unobs.shape[0]
 
-    f1 = 2 * (p*r)/(p+r)
-    return np.round(f1, 4)
+    if p + r == 0 or return_nan == True:
+        return np.nan
+    else:
+        f1 = 2 * (p*r)/(p+r)
+        return np.round(f1, 4)
+
+def AUC_PR(target, predicted_sigmoid):
+    precisions, recalls, thresholds = precision_recall_curve(target, predicted_sigmoid)
+    auc_val = auc(recalls, precisions)
+    return np.round(auc_val, 4), np.round(precisions, 4), np.round(recalls,4), thresholds
 
 
 '''Random seed is set for reproducibility of bootstrapping. 
 All final values are rounded to 4dp.'''
 
 np.random.seed(42)
-results_dataframe_path = "FinalModelsApplicationOutputs/Precipitation_Full_Valid.xlsx"
-results_df = pd.read_excel(results_dataframe_path)
+results_dataframe_paths = ["CVModelsApplicationOutputs/Cloud_CV_loKilauea_Train.xlsx",
+                           "CVModelsApplicationOutputs/Cloud_CV_loKilauea_TestSeen.xlsx",
+                           "CVModelsApplicationOutputs/Cloud_CV_loKilauea_TestUnseen.xlsx"]
+#predict = "precipitation"
+predict = "obs_cloud"
+outputs_save_path = "CalculatedMetricsSheets/Cloud_CV_KilaueaLeftOut.xlsx"
 
-predict = "precipitation"
-#predict = "obs_cloud"
+##########################################################################
+outputs_df = pd.DataFrame(columns=["set_name", "ACC", "ACC_L95", "ACC_U95",
+                                   "BACC", "BACC_L95", "BACC_U95",
+                                   "PP", "PN", "R_No", "R_Minor",
+                                   "R_NotCalc", "R_InCalc", "R_Very",
+                                   "F1", "AUC_PR"])
+for results_dataframe_path in results_dataframe_paths:
+    print(results_dataframe_path)
+    results_df = pd.read_excel(results_dataframe_path)
+    target_YN = results_df[predict]
+    target_level = results_df[predict + "_level"]
+    target_binary = target_YN.apply(map_YN_to_binary).to_numpy()
+    prediction_sigmoid = results_df[predict + "_prediction"].to_numpy()
 
-target_YN = results_df[predict]
-target_level = results_df[predict + "_level"]
-target_binary = target_YN.apply(map_YN_to_binary).to_numpy()
-prediction_sigmoid = results_df[predict + "_prediction"].to_numpy()
+    #Threshold at 0.5 and calculate the metrics which use this threshold
+    prediction_thresh = threshold_to_binary(prediction_sigmoid, 0.5)
+    acc, acc_l95, acc_u95 = accuracy_w_bootstrapCI(target_binary, prediction_thresh)
+    bacc, bacc_l95, bacc_u95 = balanced_accuracy_w_bootstrapCI(target_binary, prediction_thresh)
+    binary_precisions, subclass_recalls = precision_recall_per_class(target_binary, prediction_thresh, target_level)
+    f1 = F1_Score(target_binary, prediction_thresh)
+    auc_pr, precisions, recalls, thresholds = AUC_PR(target_binary, prediction_sigmoid)
 
-#Threshold at 0.5 and calculate the metrics which use this threshold
-prediction_thresh = threshold_to_binary(prediction_sigmoid, 0.5)
-#acc, l, u = accuracy_w_bootstrapCI(target_binary, prediction_thresh)
-#bal_acc, l, u = balanced_accuracy_w_bootstrapCI(target_binary, prediction_thresh)
-#binary_precisions, subclass_recalls = precision_recall_per_class(target_binary, prediction_thresh, target_level)
-#f1 = F1_Score(target_binary, prediction_thresh)
-
-#TODO adapt the threshold to calculate some form of curve
+    dataset_name = results_dataframe_path.split("/")[-1][:-5]
+    #For the given dataset - save all these metrics:
+    new_row = {"set_name":dataset_name,
+               "ACC":acc,
+               "ACC_L95":acc_l95,
+               "ACC_U95":acc_u95,
+               "BACC":bacc,
+               "BACC_L95":bacc_l95,
+               "BACC_U95":bacc_u95,
+               "PP":binary_precisions[1],
+               "PN":binary_precisions[0],
+               "R_No":subclass_recalls[0],
+               "R_Minor":subclass_recalls[1],
+               "R_NotCalc":subclass_recalls[2],
+               "R_InCalc":subclass_recalls[3],
+               "R_Very":subclass_recalls[4],
+               "F1":f1,
+               "AUC_PR":auc_pr}
+    outputs_df.loc[len(outputs_df)] = new_row
+outputs_df.to_excel(outputs_save_path)
