@@ -68,7 +68,11 @@ Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
 Lastarria_dictionary = {'volcano_dictionary_name':"Lastarria",
                         'volcano_name':'Lastarria',
                         'sensor_marks_mask_A': "Lastarria_A.png",
-                        'sensor_marks_mask_B': "Lastarria_B.png"}
+                        'sensor_marks_mask_B': "Lastarria_B.png",
+                        "sky_rectangle": [[20, 10], [628, 110]],
+                        "ground_rectangle": [[20, 400], [628, 476]],
+                        "flank_mask_name":"LastarriaFlankMask.png",
+                        "DD_cross_section_height":240}
 
 
 Merapi_View0_dictionary = {'volcano_dictionary_name':"MerapiView0",
