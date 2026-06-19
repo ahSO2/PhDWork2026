@@ -22,7 +22,8 @@ import VolcanoesDictionaryForQualityModels
 #and the correlation index values obtained might differ very slightly from those originally
 #calculated (and included in the first submission to Frontiers before peer reviews).
 
-data_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun12th2026/ForQualityIndexComparison/Lastarria_AllSamples_Unbalanced.csv"
+file_type = "excel"
+data_names_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/Lastarria_AllSamples_Unbalanced.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/Lastarria - All Unbalanced/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/SensorMarkMasks/"
 save_folder = "IndexValues/"
@@ -138,7 +139,10 @@ def calculate_correlation_index(image_A, image_B, sky_corners, flank_mask, cross
     correlation = pearsonr(cross_section_AA, cross_section_A).statistic
     return correlation
 
-labels = pd.read_csv(data_names_path)
+if file_type == "excel":
+    labels = pd.read_excel(data_names_path)
+else:
+    labels = pd.read_csv(data_names_path)
 image_names_A = labels["image_name"].tolist()
 image_names_B = labels["image_name_B"].tolist()
 volcano_dictionaries_list = labels["volcano_dictionary_name"].tolist()
@@ -177,4 +181,7 @@ for index in range(0, len(image_names_A)):
 
 labels["visibility_index"] = visibility_indexes
 labels["correlation_index"] = correlation_indexes
-labels.to_csv(save_folder + data_names_path.split("/")[-1][:-4] + "_QualityIndexes.csv")
+if file_type == "excel":
+    labels.to_excel(save_folder + data_names_path.split("/")[-1][:-5] + "_QualityIndexes.xlsx")
+else:
+    labels.to_csv(save_folder + data_names_path.split("/")[-1][:-4] + "_QualityIndexes.csv")
