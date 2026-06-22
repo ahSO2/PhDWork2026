@@ -66,3 +66,7 @@ QualityIndexThings/CalculatingMetrics/DelleDonneIndexes/EvalandCompareResults/CN
 QualityIndexThings/CalculatingMetrics/DelleDonneIndexes/EvalandCompareResults/LastarriaOptimalThresholdFigure_OkabeIto.jpg
 
 QualityIndexThings/CalculatingMetrics/DelleDonneIndexes/IndexValues/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx
+
+QualityIndexThings/CalculatingMetrics/__pycache__/Functions.cpython-310.pyc
+
+QualityIndexThings/CalculatingMetrics/Mismatch log.xlsx

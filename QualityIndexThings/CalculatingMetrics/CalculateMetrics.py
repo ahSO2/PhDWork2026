@@ -137,12 +137,10 @@ def AUC_PR(target, predicted_sigmoid):
 All final values are rounded to 4dp.'''
 
 np.random.seed(42)
-results_dataframe_paths = ["CVModelsApplicationOutputs/Cloud_CV_loKilauea_Train.xlsx",
-                           "CVModelsApplicationOutputs/Cloud_CV_loKilauea_TestSeen.xlsx",
-                           "CVModelsApplicationOutputs/Cloud_CV_loKilauea_TestUnseen.xlsx"]
+results_dataframe_paths = ["C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/Final Models Evaluation/OnLens/FinalEvalOutputs/OnLensSet_FinalTrainPredictions.xlsx"]
 #predict = "precipitation"
-predict = "obs_cloud"
-outputs_save_path = "CalculatedMetricsSheets/Cloud_CV_KilaueaLeftOut.xlsx"
+predict = "precipitation"
+outputs_save_path = "CalculatedMetricsSheets/TestingCalculations.xlsx"
 
 ##########################################################################
 outputs_df = pd.DataFrame(columns=["set_name", "ACC", "ACC_L95", "ACC_U95",
