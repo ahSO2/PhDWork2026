@@ -153,7 +153,7 @@ def mask_sensor_marks(image, mask_path, data_path):
         mask = cv2.imread(data_path + mask_path, -1)
         image = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
     return image
-def read_data(labels, timesteps, data_path, additional_data_path, do_mask_sensor_marks, sensor_mark_data_path, precip_is_labelled=False, cloud_is_labelled=False):
+def read_data(labels, timesteps, data_path, temporal_data_path, additional_data_path, do_mask_sensor_marks, sensor_mark_data_path, precip_is_labelled=False, cloud_is_labelled=False):
     X = []
     for index in range(0, labels.shape[0]):
         # Array to store data for this sample.
@@ -168,16 +168,19 @@ def read_data(labels, timesteps, data_path, additional_data_path, do_mask_sensor
         sensor_mask_name_A = volcano_dictionary["sensor_marks_mask_A"]
         sensor_mask_name_B = volcano_dictionary["sensor_marks_mask_B"]
 
-        if "labelled" in labels.columns:
-            if labels["labelled"][index] == "Original":
-                path_to_read = data_path
-            else:
-                path_to_read = additional_data_path
-        else:
-            path_to_read = data_path
-
         timestep_index = 0
         for timestep_name in timesteps:
+            if "labelled" in labels.columns:
+                if labels["labelled"][index] == "Original":
+                    if timestep_name == "image_name":
+                        path_to_read = data_path
+                    else:
+                        path_to_read = temporal_data_path
+
+                else:
+                    path_to_read = additional_data_path
+            else:
+                path_to_read = data_path
             image_name_A = labels[timestep_name][index]
             image_name_B = labels[timestep_name + "_B"][index]
             image_A = cv2.imread(path_to_read + "/" + image_name_A, -1)
@@ -200,9 +203,9 @@ def read_data(labels, timesteps, data_path, additional_data_path, do_mask_sensor
         X.append(this_obs_x)
     return X
 class ImageLoader(Dataset):
-    def __init__(self, labels, timesteps, data_path, additional_data_path, device, do_mask_sensor_marks=True, sensor_mark_masks_path=None):
+    def __init__(self, labels, timesteps, data_path, temporal_data_path, additional_data_path, device, do_mask_sensor_marks=True, sensor_mark_masks_path=None):
 
-        X = read_data(labels, timesteps=timesteps, data_path=data_path, additional_data_path=additional_data_path, do_mask_sensor_marks=do_mask_sensor_marks, sensor_mark_data_path=sensor_mark_masks_path)
+        X = read_data(labels, timesteps=timesteps, data_path=data_path, temporal_data_path=temporal_data_path, additional_data_path=additional_data_path, do_mask_sensor_marks=do_mask_sensor_marks, sensor_mark_data_path=sensor_mark_masks_path)
 
         self.n_timesteps = len(timesteps)
         self.X = torch.tensor(np.array(X)).float()
