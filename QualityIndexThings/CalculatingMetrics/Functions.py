@@ -170,17 +170,15 @@ def read_data(labels, timesteps, data_path, temporal_data_path, additional_data_
 
         timestep_index = 0
         for timestep_name in timesteps:
-            if "labelled" in labels.columns:
-                if labels["labelled"][index] == "Original":
-                    if timestep_name == "image_name":
-                        path_to_read = data_path
-                    else:
-                        path_to_read = temporal_data_path
-
-                else:
-                    path_to_read = additional_data_path
-            else:
+            if timestep_name == "image_name":
                 path_to_read = data_path
+            else:
+                path_to_read = temporal_data_path
+            #Check if it's actually an additional sample:
+            if "labelled" in labels.columns:
+                if labels["labelled"][index] == "Additional":
+                    path_to_read = additional_data_path
+
             image_name_A = labels[timestep_name][index]
             image_name_B = labels[timestep_name + "_B"][index]
             image_A = cv2.imread(path_to_read + "/" + image_name_A, -1)

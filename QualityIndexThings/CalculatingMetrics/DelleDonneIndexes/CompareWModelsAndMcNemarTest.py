@@ -30,8 +30,8 @@ def balanced_accuracy_w_bootstrapCI(target, predicted):
         #Calculate balanced accuracy
         bootstrap_accs.append(balanced_accuracy(selection))
 
-    lower = np.percentile(bootstrap_accs, q=5)
-    upper = np.percentile(bootstrap_accs, q=95)
+    lower = np.percentile(bootstrap_accs, q=2.5)
+    upper = np.percentile(bootstrap_accs, q=97.5)
     return np.round(bal_acc, 4), np.round(lower, 4), np.round(upper, 4)
 
 def balanced_accuracy(dataframe):

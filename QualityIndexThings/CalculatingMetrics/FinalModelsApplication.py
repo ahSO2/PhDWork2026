@@ -34,16 +34,17 @@ import Functions
 
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun12th2026/ForQualityIndexComparison/Lastarria_AllSamples_Unbalanced.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/ForQualityIndexComparison/Lastarria_AllSamples_Unbalanced.csv"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
-#Comment out: Optionally exclude Kilauea samples
+#Comment out: Optionally exclude/isolate Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
 #image_names_df.reset_index(inplace=True)
-images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/Lastarria - All Unbalanced/" #Folder storing image data
-additional_images_path = None
+images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/" #Folder storing image data
+temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/"
+additional_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/Cloud_Full_TrainExpanded_AdditionalSamples/"
 chunk_size = 100 #Number of images to load and predict on at one time (set lower if memory is an issue)
 outputs_save_path = "FinalModelsApplicationOutputs/"  #Predictions saved here
-sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
+sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
 #################################################
 
 #Define the timestep sizes used for each model
@@ -85,9 +86,9 @@ for chunk in range(1, n_chunks + 1):
     application_time_start = time.time()
 
     #Load this chunk of data
-    eval_set_for_precip = Functions.ImageLoader(labels=df_chunk, timesteps=timesteps_for_precip, data_path = images_path, additional_data_path=additional_images_path, device= device, do_mask_sensor_marks=True, sensor_mark_masks_path= sensor_mark_masks_path)
+    eval_set_for_precip = Functions.ImageLoader(labels=df_chunk, timesteps=timesteps_for_precip, data_path = images_path, temporal_data_path=temporal_images_path, additional_data_path=additional_images_path, device= device, do_mask_sensor_marks=True, sensor_mark_masks_path= sensor_mark_masks_path)
     dataloader_precip = DataLoader(eval_set_for_precip, batch_size=1, shuffle=False, drop_last=False)
-    eval_set_for_cloud = Functions.ImageLoader(labels=df_chunk, timesteps=timesteps_for_cloud, data_path=images_path,
+    eval_set_for_cloud = Functions.ImageLoader(labels=df_chunk, timesteps=timesteps_for_cloud, data_path=images_path, temporal_data_path=temporal_images_path,
                                                 additional_data_path=additional_images_path, device=device,
                                                 do_mask_sensor_marks=True,
                                                 sensor_mark_masks_path=sensor_mark_masks_path)
