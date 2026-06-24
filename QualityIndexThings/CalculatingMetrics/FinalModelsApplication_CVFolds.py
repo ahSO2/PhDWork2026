@@ -34,19 +34,20 @@ import Functions
 
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun12th2026/CloudCVSplits/Cloud_CV_loReventador_TestUnseen.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudCVSplits/Cloud_CV_loKilauea_TestUnseen.csv"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
 #Comment out: Optionally exclude Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
 #image_names_df.reset_index(inplace=True)
-images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/Cloud Full Split - Seen Locations/" #Folder storing image data
-additional_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/FullFold Additional Training Samples For Cloud/"
+images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/" #Folder storing image data
+temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/" #Folder storing timestep image data
+additional_images_path = None
 chunk_size = 100 #Number of images to load and predict on at one time (set lower if memory is an issue)
 outputs_save_path = "CVModelsApplicationOutputs/"  #Predictions saved here
-sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
+sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
 
 to_predict = "obs_cloud"
-saved_model_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment132/Reventador_epoch60.pth"
+saved_model_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment223/Outputs/Kilauea_epoch20.pth"
 #timesteps = ["image_name"]
 timesteps = ["minus_ten_s_name", "image_name", "plus_ten_s_name"]
 #################################################
@@ -86,7 +87,7 @@ for chunk in range(1, n_chunks + 1):
     application_time_start = time.time()
 
     #Load this chunk of data
-    eval_set = Functions.ImageLoader(labels=df_chunk, timesteps = timesteps, data_path = images_path, additional_data_path=additional_images_path, device= device, do_mask_sensor_marks=True, sensor_mark_masks_path= sensor_mark_masks_path)
+    eval_set = Functions.ImageLoader(labels=df_chunk, timesteps = timesteps, data_path = images_path, temporal_data_path=temporal_images_path, additional_data_path=additional_images_path, device= device, do_mask_sensor_marks=True, sensor_mark_masks_path= sensor_mark_masks_path)
     dataloader = DataLoader(eval_set, batch_size=1, shuffle=False, drop_last=False)
 
     #Iterating over each observation in the chunk

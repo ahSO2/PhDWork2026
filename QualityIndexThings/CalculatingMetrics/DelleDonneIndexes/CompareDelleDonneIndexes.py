@@ -83,8 +83,8 @@ def plot_indexes_w_threshold(df_to_plot, thresh_v_to_plot, thresh_c_to_plot):
     ax.annotate("visibility = " + str(thresh_v_to_plot), xy=(0.95, thresh_v_prop), rotation=0, xycoords='axes fraction', xytext=(0, 50),
                 textcoords='offset pixels', horizontalalignment="right")
 
-    plt.show()
-    #plt.savefig(results_save_path.split("/")[0] + "/" + figure_save_name, dpi=300)
+    #plt.show()
+    plt.savefig(results_save_path.split("/")[0] + "/" + figure_save_name, dpi=300)
 
 
 if df_type == "excel":
@@ -92,7 +92,7 @@ if df_type == "excel":
 else:
     indexes_df = pd.read_csv(indexes_df_path)
 indexes_df["filtering_target"] = indexes_df["obscurance"]
-'''
+
 #Evaluate the standard thresholds
 bacc_og, eval_df_og = evaluate_using_threshold(indexes_df, thresh_v=original_thresh_v, thresh_c=original_thresh_c)
 print("Balanced accuracy with standard threshold:")
@@ -118,8 +118,8 @@ best_thresh_c = results_df["correlation_threshold"].tolist()[0]
 print("Best threshold values identified: ")
 print("For visibility " + str(best_thresh_v))
 print("For correlation " + str(best_thresh_c))
-'''
-best_thresh_v, best_thresh_c = 3.1, -0.4
+
+#best_thresh_v, best_thresh_c = 3.1, -0.4
 #Recalculate for the best combination, and produce a visualisation:
 bacc, eval_df = evaluate_using_threshold(indexes_df, best_thresh_v, best_thresh_c)
 plot_indexes_w_threshold(eval_df, best_thresh_v, best_thresh_c)
