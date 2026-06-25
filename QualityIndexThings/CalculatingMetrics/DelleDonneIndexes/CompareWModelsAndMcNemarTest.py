@@ -144,7 +144,9 @@ def map_correctness_to_McNemar_vals(row):
 
 indexes_df_path = "IndexValues/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx"
 DD_thresh_v = 3.1
+DD_thresh_v_OG = 4
 DD_thresh_c = -0.4
+DD_thresh_c_OG = -0.5
 results_folder = "EvalAndCompareResults/"
 np.random.seed(42) #For reproducibility of the bootstrap CIs
 
@@ -182,6 +184,21 @@ results_df.loc[1] = {"Predictor":"DDIs",
                      "R_NotCalc": DD_subclass_recalls[2], "R_InCalc": DD_subclass_recalls[3],
                      "R_Very": DD_subclass_recalls[4],
                      "F1": DD_f1,
+                     }
+
+#Calculate balanced accuracy with bootstrap CI for the original
+calculator_OG = DD_index_obs_prediction_calculator(DD_thresh_v_OG, DD_thresh_c_OG)
+indexes_df["obscurance_predicted_DD_OGthresh"] = indexes_df.apply(calculator_OG.calculate_overall_obs_prediction_DD, axis=1)
+DDOG_bacc, DDOG_bacc_l95, DDOG_bacc_u95 = balanced_accuracy_w_bootstrapCI(indexes_df["obscurance_binary"], indexes_df["obscurance_predicted_DD_OGthresh"])
+DDOG_binary_precisions, DDOG_subclass_recalls = precision_recall_per_class(target=indexes_df["obscurance_binary"], predicted=indexes_df["obscurance_predicted_DD_OGthresh"], target_level=indexes_df["obscurance_level"])
+DDOG_f1 = F1_Score(target=indexes_df["obscurance_binary"], predicted=indexes_df["obscurance_predicted_DD_OGthresh"])
+results_df.loc[2] = {"Predictor":"DDIs_OGthresh",
+                     "BACC":DDOG_bacc, "BACC_L95":DDOG_bacc_l95, "BACC_U95":DDOG_bacc_u95,
+                     "PP": DDOG_binary_precisions[1], "PN": DDOG_binary_precisions[0],
+                     "R_No": DDOG_subclass_recalls[0], "R_Minor": DDOG_subclass_recalls[1],
+                     "R_NotCalc": DDOG_subclass_recalls[2], "R_InCalc": DDOG_subclass_recalls[3],
+                     "R_Very": DDOG_subclass_recalls[4],
+                     "F1": DDOG_f1,
                      }
 
 if ".csv" in indexes_df_path:

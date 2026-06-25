@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.calibration import calibration_curve, CalibrationDisplay
 
-predictions_df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/Precipitation_Full_TestUnseen.xlsx"
+predictions_df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/Precipitation_Full_TestSeen.xlsx"
 predictions_df = pd.read_excel(predictions_df_path)
 target = "precipitation"
 save_folder = "ReliabilityDiagrams/"
-n_bins = 15
+n_bins = 4
 def map_YN_to_binary(value):
     if value == "Yes":
         return 1
@@ -109,8 +109,6 @@ macroCE = MacroCE(y_prob, y_test)
 print("MacroCE: " + str(macroCE))
 
 
-
-
 prob_true, prob_pred = calibration_curve(y_test, y_prob, n_bins=n_bins)
 disp = CalibrationDisplay(prob_true, prob_pred, y_prob)
 #disp.plot()
@@ -122,8 +120,8 @@ fig, ax = plt.subplots(figsize=(18*cm, 18*cm))
 range = np.arange(0, 1.1, 0.1)
 ax.plot(range, range, linestyle="dotted", color="black", label="Perfectly calibrated")
 ax.plot(prob_pred, prob_true, label="Model", marker="s")
-ax.set_xlabel("Mean predicted probability")
-ax.set_ylabel("Fraction of positives")
+ax.set_xlabel("Mean Sigmoid Score", fontsize=12)
+ax.set_ylabel("Proportion of Positives", fontsize=12)
 plt.legend()
-plt.savefig(save_folder + "Target" + target + "_" + predictions_df_path.split("/")[-1][:-5] + ".jpg")
+plt.savefig(save_folder + "Target" + target + "_" + predictions_df_path.split("/")[-1][:-5] + "_4bins.jpg", dpi=300)
 plt.show()
