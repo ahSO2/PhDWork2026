@@ -34,14 +34,14 @@ import Functions
 
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/ForQualityIndexComparison/Lastarria_AllSamples_Unbalanced.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Cotopaxi_2023-04-08/ImageNamesSorted.csv"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
 #Comment out: Optionally exclude/isolate Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
 #image_names_df.reset_index(inplace=True)
-images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/" #Folder storing image data
-temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/"
-additional_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/Cloud_Full_TrainExpanded_AdditionalSamples/"
+images_path = "D:/Cotopaxi/2023/2023-04-08_Corrected_mod1" #Folder storing image data
+temporal_images_path = "D:/Cotopaxi/2023/2023-04-08_Corrected_mod1/Temporal"
+additional_images_path = None
 chunk_size = 100 #Number of images to load and predict on at one time (set lower if memory is an issue)
 outputs_save_path = "FinalModelsApplicationOutputs/"  #Predictions saved here
 sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
