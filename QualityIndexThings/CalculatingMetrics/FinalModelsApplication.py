@@ -32,18 +32,22 @@ import Functions
 #available under a MIT licence at:
 #https://github.com/PacktPublishing/Modern-Computer-Vision-with-PyTorch
 
+
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Cotopaxi_2023-04-08/ImageNamesSorted.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Kilauea_2023-08-25/ImageNamesSorted.csv"
+#image_names_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/LightDilutionAndLabellerAgreement/ManualLabels/SelectedSamplesForLabelling_Batch1_CloudIndex.xlsx"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
 #Comment out: Optionally exclude/isolate Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
 #image_names_df.reset_index(inplace=True)
-images_path = "D:/Cotopaxi/2023/2023-04-08_Corrected_mod1" #Folder storing image data
-temporal_images_path = "D:/Cotopaxi/2023/2023-04-08_Corrected_mod1/Temporal"
+images_path = "D:/Kilauea/2023/2023-08-25_Corrected_mod1" #Folder storing image data
+#images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/"
+temporal_images_path = "D:/Kilauea/2023/2023-08-25_Corrected_mod1/Temporal"
+#temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/"
 additional_images_path = None
-chunk_size = 100 #Number of images to load and predict on at one time (set lower if memory is an issue)
-outputs_save_path = "FinalModelsApplicationOutputs/"  #Predictions saved here
+chunk_size = 50 #Number of images to load and predict on at one time (set lower if memory is an issue)
+outputs_save_path = "FinalModelsApplicationOutputs/FullDays/"  #Predictions saved here
 sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
 #################################################
 
@@ -69,6 +73,8 @@ cloud_model.eval()
 #Read the data, and apply models:
 print("Reading training data from: " + images_path)
 #Loop over subsets of size "chunk", reducing the memory required
+all_precip_predictions = []
+all_cloud_predictions = []
 n_chunks = math.ceil(image_names_df.shape[0]/chunk_size)
 for chunk in range(1, n_chunks + 1):
     start_index = (chunk - 1) * chunk_size
@@ -122,5 +128,5 @@ for chunk in range(1, n_chunks + 1):
 #Write out the predictions as columns of the image names dataframe
 image_names_df["precipitation_prediction"] = all_precip_predictions
 image_names_df["obs_cloud_prediction"] = all_cloud_predictions
-image_names_df.to_excel(outputs_save_path + image_names_path.split("/")[-1][:-4] + ".xlsx")
+image_names_df.to_excel(outputs_save_path + image_names_path.split("/")[-2] + ".xlsx")
 
