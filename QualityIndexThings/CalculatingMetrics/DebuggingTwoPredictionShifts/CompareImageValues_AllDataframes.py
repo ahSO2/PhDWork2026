@@ -7,16 +7,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-dataframes_folder_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun12th2026/PrecipitationFullSplit/"
-save_path = "CheckingImgValues_AllPrecipDFs.xlsx"
+dataframes_folder_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun12th2026/CloudFullSplit/"
+save_path = "CheckingImgValues_AllCloudDFs.xlsx"
 
 timesteps_to_check = ["minus_one_min_name", "image_name", "plus_one_min_name", "minus_ten_s_name", "plus_ten_s_name", "minus_one_min_name_B", "image_name_B", "plus_one_min_name_B", "minus_ten_s_name_B", "plus_ten_s_name_B"]
 original_main_data_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/FullDatasetCorrectedWithVolcDict2/"
 original_temporal_data_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/FullDatasetCorrectedWithVolcDict2Temporal/"
 original_additional_data_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/AdditionalDataPool_SelectedForFGCloudExpmt/"
-ORDA_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_OldVersionWithPotentialIssue/Precipitation Full Split - Seen Locations/"
-ORDA_Lastarria_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_OldVersionWithPotentialIssue/Lastarria - Balanced for Precipitation Unseen Test/"
-ORDA_additional_data_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_OldVersionWithPotentialIssue/FullFold Additional Training Samples For Precipitation/"
+ORDA_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_OldVersionWithPotentialIssue/Cloud Full Split - Seen Locations/"
+ORDA_Lastarria_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_OldVersionWithPotentialIssue/Lastarria - Balanced for Cloud Unseen Test/"
+ORDA_additional_data_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_OldVersionWithPotentialIssue/FullFold Additional Training Samples For Cloud/"
 
 '''
 outputs_log = pd.DataFrame(columns=["image_name", "timestep_w_issue", "timestep_image_name", "issue"])
@@ -59,8 +59,8 @@ for df_name in os.listdir(dataframes_folder_path):
                 outputs_log.loc[len(outputs_log)] = new_row
                 print("Read-in issue")
     outputs_log.to_excel(save_path)
-
 '''
+
 #View the non-matching pairs:
 mismatch_df = pd.read_excel(save_path)
 

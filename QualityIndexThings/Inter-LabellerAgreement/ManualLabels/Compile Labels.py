@@ -2,10 +2,10 @@
 #my label, TW label, TP label, and my model predictions.
 import pandas as pd
 
-target = "obs_cloud"
-zooniverse_labels_path = "FinalZooniverseExports/cloud-labelling-classifications.csv"
+target = "precipitation"
+zooniverse_labels_path = "FinalZooniverseExports/precipitation-labelling-classifications.csv"
 my_existing_labels_path = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/UpdatedCorrectedDataframes/AllCorrectedChunkandIndivLabels.xlsx"
-model_predictions_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/ManualLabellingVariation/SelectedSamplesForLabelling_Batch1_CloudIndex.xlsx"
+model_predictions_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/ManualLabellingVariation/SelectedSamplesForLabelling_Batch1_PrecipIndex.xlsx"
 
 base_df = pd.read_excel(model_predictions_path)
 my_labels_df = pd.read_excel(my_existing_labels_path)
@@ -45,7 +45,15 @@ zooniverse_labels["image_name"] = zooniverse_labels["subject_data"].apply(map_su
 zooniverse_labels["annotator_level"] = zooniverse_labels["annotations"].apply(map_annotation_to_classification)
 
 TW_labels = zooniverse_labels[zooniverse_labels["user_name"]=="twvolc"][["image_name", "annotator_level"]]
+print(TW_labels.shape)
+TW_labels["duplicated"] = TW_labels.duplicated(["image_name"])
+if target == "precipitation":
+    print("Removing duplicate precipitation label by TW")
+    TW_labels = TW_labels[:-1] #Dropping the last label by TW which is an exact duplicate of an earlier label
+print(TW_labels["duplicated"].value_counts())
+
 TP_labels = zooniverse_labels[zooniverse_labels["user_name"]=="tpering"][["image_name", "annotator_level"]]
+print(TP_labels.shape)
 
 all_annotator_labels = pd.merge(base_plus_my_labels, TW_labels, left_on='image_name', right_on='image_name', how='left')
 all_annotator_labels.rename(columns={"annotator_level":target+"_level_TW"}, inplace=True)

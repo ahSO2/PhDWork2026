@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 
-directory_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/BeforeLabelCorrections_Feb19th2026/PrecipitationFullSplit/"
+directory_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/BeforeLabelCorrections_Feb19th2026/FGCloudCVSplits/"
 dataframes_to_check = os.listdir(directory_path)
 corrected_df = pd.read_excel("CorrectedMistakes_NoDuplicates.xlsx")
 #corrected_df["core_name"] = corrected_df["image_name"].apply(core_name_only)

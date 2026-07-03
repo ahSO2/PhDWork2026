@@ -35,15 +35,15 @@ import Functions
 
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Kilauea_2023-08-25/ImageNamesSorted.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Reventador_2024-10-05/ImageNamesSorted.csv"
 #image_names_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/LightDilutionAndLabellerAgreement/ManualLabels/SelectedSamplesForLabelling_Batch1_CloudIndex.xlsx"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
 #Comment out: Optionally exclude/isolate Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
 #image_names_df.reset_index(inplace=True)
-images_path = "D:/Kilauea/2023/2023-08-25_Corrected_mod1" #Folder storing image data
+images_path = "D:/Reventador/2024/2024-10-05_Corrected_mod1" #Folder storing image data
 #images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/"
-temporal_images_path = "D:/Kilauea/2023/2023-08-25_Corrected_mod1/Temporal"
+temporal_images_path = "D:/Reventador/2024/2024-10-05_Corrected_mod1/Temporal"
 #temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/"
 additional_images_path = None
 chunk_size = 50 #Number of images to load and predict on at one time (set lower if memory is an issue)
