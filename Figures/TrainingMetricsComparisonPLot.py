@@ -3,32 +3,32 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-lhs = "76"
-rhs = "83"
-locations = ["Reventador"]
+lhs = "186"
+rhs = "231"
+locations = ["OnLensSetFullSplit"]
 output_save_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Version for submission - R2/Figures/"
 
-#lhs_df_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment" + lhs + "/Outputs/"
-lhs_df_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment76/"
-rhs_df_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment" + rhs + "/Outputs/"
+lhs_df_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment" + lhs + "/"
+#lhs_df_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment78/"
+rhs_df_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment" + rhs + "/"
 
 for location in locations:
-    #lhs_data = pd.read_excel(lhs_df_path + location + "_Metrics.xlsx")
-    lhs_data = pd.read_excel(lhs_df_path + "Outputs/Reventador_Metrics_nCorrected300_addCorrect-n.xlsx")
+    lhs_data = pd.read_excel(lhs_df_path + location + "_Metrics.xlsx")
+    #lhs_data = pd.read_excel(lhs_df_path + "Outputs/Merapi_Metrics_nCorrected600_addCorrect-y.xlsx")
     rhs_data = pd.read_excel(rhs_df_path  + location + "_Metrics.xlsx")
 
     lhs_valid_accs = lhs_data["ValidAccuracies"]
     rhs_valid_accs = rhs_data["ValidAccuracies"]
-    lhs_train_accs = lhs_data["TrainAccuracies"]
-    rhs_train_accs = rhs_data["TrainAccuracies"]
-    lhs_test_accs = lhs_data["TestAccuracies"]
-    rhs_test_accs = rhs_data["TestAccuracies"]
+    lhs_train_accs = lhs_data["TrainAccuracies_NoAug"]
+    rhs_train_accs = rhs_data["TrainAccuracies_NoAug"]
+    #lhs_test_accs = lhs_data["TestAccuracies"]
+    #rhs_test_accs = rhs_data["TestAccuracies"]
     lhs_valid_losses = lhs_data["ValidLosses"]
     rhs_valid_losses = rhs_data["ValidLosses"]
-    lhs_train_losses = lhs_data["TrainLosses"]
-    rhs_train_losses = rhs_data["TrainLosses"]
-    lhs_test_losses = lhs_data["TestLosses"]
-    rhs_test_losses = rhs_data["TestLosses"]
+    lhs_train_losses = lhs_data["TrainLosses_NoAug"]
+    rhs_train_losses = rhs_data["TrainLosses_NoAug"]
+    #lhs_test_losses = lhs_data["TestLosses"]
+    #rhs_test_losses = rhs_data["TestLosses"]
 
 
     cm = 1 / 2.54  # centimeters in inches
@@ -39,15 +39,15 @@ for location in locations:
     axs[0].plot(r_eps, rhs_valid_accs, label = "Valid_Final")
     axs[0].plot(l_eps, lhs_train_accs, label="Train_Ctrl")
     axs[0].plot(r_eps, rhs_train_accs, label="Train_Final")
-    axs[0].plot(l_eps, lhs_test_accs, label="Test_Ctrl")
-    axs[0].plot(r_eps, rhs_test_accs, label="Test_Final")
+    #axs[0].plot(l_eps, lhs_test_accs, label="Test_Ctrl")
+    #axs[0].plot(r_eps, rhs_test_accs, label="Test_Final")
     axs[1].plot(l_eps, lhs_valid_losses, label="Valid_Ctrl")
     axs[1].plot(r_eps, rhs_valid_losses, label="Valid_Final")
     axs[1].plot(l_eps, lhs_train_losses, label="Train_Ctrl")
     axs[1].plot(r_eps, rhs_train_losses, label="Train_Final")
-    axs[1].plot(l_eps, lhs_test_losses, label="Test_Ctrl")
-    axs[1].plot(r_eps, rhs_test_losses, label="Test_Final")
-
+    #axs[1].plot(l_eps, lhs_test_losses, label="Test_Ctrl")
+    #axs[1].plot(r_eps, rhs_test_losses, label="Test_Final")
+    axs[0].axhline(y=0.99, c="red")
     axs[0].set_xlabel("Epoch")
     axs[1].set_xlabel("Epoch")
 

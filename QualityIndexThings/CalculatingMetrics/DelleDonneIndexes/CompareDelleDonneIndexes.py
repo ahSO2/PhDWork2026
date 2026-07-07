@@ -11,7 +11,7 @@ import seaborn as sns
 df_type = "excel"
 indexes_df_path = "IndexValues/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx"
 results_save_path = "EvalandCompareResults/Lastarria_AllSamples_Unbalanced_ThresholdChoice.csv"
-figure_save_name = "LastarriaOptimalThresholdFigure_TolVibrant.jpg"
+figure_save_name = "LastarriaOptimalThresholdFigure_Custom.jpg"
 original_thresh_v = 4
 original_thresh_c = -0.5
 thresh_v_range = [3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4]
@@ -57,15 +57,21 @@ def evaluate_using_threshold(original_df, thresh_v, thresh_c):
     return np.round(balanced_acc, 4), evaluation_df
 
 def plot_indexes_w_threshold(df_to_plot, thresh_v_to_plot, thresh_c_to_plot):
+
+    df_to_plot.rename({"obscurance":"Obscurance", "obscurance_level":"Obscurance Level"}, inplace=True, axis="columns")
+
     cm = 1 / 2.54  # centimeters in inches
     fig, ax = plt.subplots(figsize=(18*cm, 18*cm))
-    custom = sns.color_palette(['#245642', '#236b52', '#fe960b', '#e75227', '#bc0000'])
+    #custom = sns.color_palette(['#245642', '#236b52', '#fe960b', '#e75227', '#bc0000'])
+    custom = sns.color_palette(["#007c71", "#6cf0d3", "#ffb000", "#f66100", "#f42f69"])
     palette = sns.color_palette(['#228833', '#4477AA', '#CCBB44', "#EE6677", "#AA3377"])
     tol_vibrant = sns.color_palette(['#009988', '#33BBEE', '#EE3377', '#EE7733', '#CC3311'])
-    s = sns.scatterplot(data=df_to_plot, y="visibility_index", x="correlation_index", hue="obscurance_level",
-                    hue_order=["No", "Minor", "Not Calc", "In Calc", "Very"],
-                    palette=tol_vibrant, alpha=0.3, ax=ax, linewidth=0)
-    plt.legend(title="Obscurance Level")
+    markers = {"Yes": "s", "No": "o"}
+    s = sns.scatterplot(data=df_to_plot, y="visibility_index", x="correlation_index", hue="Obscurance Level",
+                    hue_order=["No", "Minor", "Not Calc", "In Calc", "Very"], style="Obscurance", markers=markers,
+                    palette=custom, alpha=0.65, s=20, ax=ax, linewidth=0, edgecolor="black")
+    #plt.legend(title="Obscurance Level")
+    plt.legend()
     ax.axvline(x=thresh_c_to_plot, linestyle="--", color="black")
     ax.axhline(y=thresh_v_to_plot, linestyle="--", color="black")
     # ax.set_title("Physics-based Indexes For Labelled Lastarria Data", fontsize=15)
@@ -79,12 +85,13 @@ def plot_indexes_w_threshold(df_to_plot, thresh_v_to_plot, thresh_c_to_plot):
     thresh_v_prop = (thresh_v_to_plot - visibility_values.min())/visibility_range
     thresh_c_prop = (thresh_c_to_plot - correlation_values.min())/correlation_range
 
-    ax.annotate("correlation = " + str(thresh_c_to_plot), xy=(thresh_c_prop, 0.95), rotation=90, xycoords = 'axes fraction', xytext = (-20, 0), textcoords = 'offset pixels', verticalalignment='top')
-    ax.annotate("visibility = " + str(thresh_v_to_plot), xy=(0.95, thresh_v_prop), rotation=0, xycoords='axes fraction', xytext=(0, 50),
-                textcoords='offset pixels', horizontalalignment="right")
+    ax.annotate("correlation = " + str(thresh_c_to_plot), xy=(thresh_c_prop, 0.95), rotation=90, xycoords = 'axes fraction', xytext = (-35, 0), textcoords = 'offset pixels', verticalalignment='top',
+                bbox=dict(fc="white", ec="white", lw=0, alpha=0.7))
+    ax.annotate("visibility = " + str(thresh_v_to_plot), xy=(0.95, thresh_v_prop), rotation=0, xycoords='axes fraction', xytext=(0, 60),
+                textcoords='offset pixels', horizontalalignment="right", bbox=dict(fc="white", ec="white", lw=0, alpha=0.7))
 
-    #plt.show()
     plt.savefig(results_save_path.split("/")[0] + "/" + figure_save_name, dpi=300)
+    plt.show()
 
 
 if df_type == "excel":

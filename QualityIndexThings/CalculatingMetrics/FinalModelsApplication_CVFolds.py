@@ -34,7 +34,7 @@ import Functions
 
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudCVSplits/Cloud_CV_loKilauea_TestUnseen.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/PrecipitationCVSplits/Precipitation_CV_loReventador_TestUnseen.csv"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
 #Comment out: Optionally exclude Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
@@ -43,11 +43,11 @@ images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/
 temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/" #Folder storing timestep image data
 additional_images_path = None
 chunk_size = 100 #Number of images to load and predict on at one time (set lower if memory is an issue)
-outputs_save_path = "CVModelsApplicationOutputs/"  #Predictions saved here
+outputs_save_path = "CVModelsApplicationOutputs_Re-trainedModels/"  #Predictions saved here
 sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
 
-to_predict = "obs_cloud"
-saved_model_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment223/Outputs/Kilauea_epoch20.pth"
+to_predict = "precipitation"
+saved_model_path = "C:/Users/ggp24ash/Documents/HPC Outputs/Experiment234/Reventador_epoch150.pth"
 #timesteps = ["image_name"]
 timesteps = ["minus_ten_s_name", "image_name", "plus_ten_s_name"]
 #################################################
