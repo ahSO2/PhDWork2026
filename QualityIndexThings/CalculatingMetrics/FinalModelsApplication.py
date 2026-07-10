@@ -35,19 +35,22 @@ import Functions
 
 #################################################
 #####Key variables for this application###########
-image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Reventador_2024-10-05/ImageNamesSorted.csv"
+image_names_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/Lastarria_2023-05-04/ImageNamesSorted.csv"
 #image_names_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/LightDilutionAndLabellerAgreement/ManualLabels/SelectedSamplesForLabelling_Batch1_CloudIndex.xlsx"
+#image_names_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudFullSplit/Cloud_Full_TestUnseen.csv"
 image_names_df = pd.read_csv(image_names_path) #Spreadsheet containing name of each sample, plus associated timestep and off-band sample names
 #Comment out: Optionally exclude/isolate Kilauea samples
 #image_names_df = image_names_df[image_names_df["volcano_name"] != "Kilauea"]
 #image_names_df.reset_index(inplace=True)
-images_path = "D:/Reventador/2024/2024-10-05_Corrected_mod1" #Folder storing image data
+images_path = "D:/Lastarria/2023/2023-05-04_Corrected_mod1" #Folder storing image data
 #images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/"
-temporal_images_path = "D:/Reventador/2024/2024-10-05_Corrected_mod1/Temporal"
+temporal_images_path = "D:/Lastarria/2023/2023-05-04_Corrected_mod1/Temporal"
 #temporal_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset_AssociatedTemporal/"
+#additional_images_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/Cloud_Full_TrainExpanded_AdditionalSamples/"
 additional_images_path = None
 chunk_size = 50 #Number of images to load and predict on at one time (set lower if memory is an issue)
-outputs_save_path = "FinalModelsApplicationOutputs/FullDays/"  #Predictions saved here
+outputs_save_path = "FinalModelsApplicationOutputs_RetrainedPrecipModel/FullDays/"  #Predictions saved here
+#outputs_save_path = "FinalModelsApplicationOutputs_RetrainedPrecipModel/"
 sensor_mark_masks_path = ("C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/") #Path to folder containing masks used to infill small consistent marks on images (can be "None" if not req.)
 #################################################
 
@@ -65,7 +68,7 @@ torch.cuda.empty_cache()
 precip_model = Functions.get_triple_branched_resnet18(device)
 cloud_model = Functions.get_triple_branched_resnet18(device)
 print("Loading trained model weights:")
-precip_model.load_state_dict(torch.load("C:/Users/ggp24ash/PycharmProjects/QualityIndexModels/SavedModelWeights/PrecipitationModel.pth", weights_only=True))
+precip_model.load_state_dict(torch.load("C:/Users/ggp24ash/Documents/HPC Outputs/Experiment239/OnLensSet_epoch1300.pth", weights_only=True))
 cloud_model.load_state_dict(torch.load("C:/Users/ggp24ash/PycharmProjects/QualityIndexModels/SavedModelWeights/ObsCloudModel.pth", weights_only=True))
 precip_model.eval()
 cloud_model.eval()

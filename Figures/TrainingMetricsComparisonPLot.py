@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 lhs = "186"
-rhs = "231"
+rhs = "238"
 locations = ["OnLensSetFullSplit"]
 output_save_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Version for submission - R2/Figures/"
 

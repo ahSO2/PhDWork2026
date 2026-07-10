@@ -9,7 +9,7 @@ from sklearn.metrics import precision_recall_curve
 #UNOBSCURED DATA. Threshold values output by the sklearn function
 #will be relative to this inverted setup.
 
-predictions_df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/Precipitation_Full_TestSeen.xlsx"
+predictions_df_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/Precipitation_Full_TestSeen.xlsx"
 predictions_df = pd.read_excel(predictions_df_path)
 target = "precipitation"
 save_folder = "PrecisionRecallCurves/"

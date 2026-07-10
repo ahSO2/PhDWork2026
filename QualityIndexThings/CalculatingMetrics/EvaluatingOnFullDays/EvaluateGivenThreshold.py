@@ -6,7 +6,7 @@ import os
 
 import pandas as pd
 
-folder_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/FullDays"
+folder_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/FullDays"
 precip_threshold = 0.5
 cloud_threshold = 0.5
 

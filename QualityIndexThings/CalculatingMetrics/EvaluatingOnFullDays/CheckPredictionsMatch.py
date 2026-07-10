@@ -2,7 +2,7 @@
 #sequence gives the same reuslt as the original version
 import pandas as pd
 
-df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/ImageNamesSorted.xlsx"
+df_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/ImageNamesSorted.xlsx"
 df = pd.read_excel(df_path)
 check_column = "obs_cloud"
 df["predictions_equal"] = df[check_column + "_model_prediction"] == df[check_column + "_prediction"]

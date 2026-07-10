@@ -137,14 +137,15 @@ def AUC_PR(target, predicted_sigmoid):
 All final values are rounded to 4dp.'''
 
 np.random.seed(42)
-results_dataframe_paths = ["CVModelsApplicationOutputs_Re-trainedModels/Precipitation_CV_loCotopaxi_TestUnseen.xlsx",
-                           "CVModelsApplicationOutputs_Re-trainedModels/Precipitation_CV_loKilauea_TestUnseen.xlsx",
-                           "CVModelsApplicationOutputs_Re-trainedModels/Precipitation_CV_loMerapi_TestUnseen.xlsx",
-                           "CVModelsApplicationOutputs_Re-trainedModels/Precipitation_CV_loReventador_TestUnseen.xlsx",
-                           ]
-predict = "precipitation"
-#predict = "obs_cloud"
-outputs_save_path = "CalculatedMetricsSheets/Precipitation_CrossValid_TestUnseen_Re-trainedModels.xlsx"
+results_dataframe_paths = ["FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TrainExpanded.xlsx",
+                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_Valid.xlsx",
+                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen.xlsx",
+                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen_ExcludingKilauea.xlsx",
+                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen_KilaueaOnly.xlsx",
+                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestUnseen.xlsx"]
+#predict = "precipitation"
+predict = "obs_cloud"
+outputs_save_path = "CalculatedMetricsSheets/Cloud_Full_Re-trainedModels.xlsx"
 
 ##########################################################################
 outputs_df = pd.DataFrame(columns=["set_name", "ACC", "ACC_L95", "ACC_U95",

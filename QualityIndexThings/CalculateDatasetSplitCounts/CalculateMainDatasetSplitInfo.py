@@ -5,19 +5,19 @@
 import pandas as pd
 import numpy as np
 
-folder_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/PrecipitationFullSplit/"
-target_name = "precipitation"
-save_path = "PrecipitationFullSplit.xlsx"
-dataset_names = ["Precipitation_Full_Train.csv",
-            "Precipitation_Full_TrainExpanded.csv",
-            "Precipitation_Full_Valid.csv",
-            "Precipitation_Full_TestSeen.csv",
-            "Precipitation_Full_TestUnseen.csv"]
+folder_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudFullSplit/"
+target_name = "obs_cloud"
+save_path = "CloudFullSplit.xlsx"
+dataset_names = ["Cloud_Full_Train.csv",
+            "Cloud_Full_TrainExpanded.csv",
+            "Cloud_Full_Valid.csv",
+            "Cloud_Full_TestSeen.csv",
+            "Cloud_Full_TestUnseen.csv"]
 
-for_total = ["Precipitation_Full_TrainExpanded.csv",
-            "Precipitation_Full_Valid.csv",
-            "Precipitation_Full_TestSeen.csv",
-            "Precipitation_Full_TestUnseen.csv"]
+for_total = ["Cloud_Full_TrainExpanded.csv",
+            "Cloud_Full_Valid.csv",
+            "Cloud_Full_TestSeen.csv",
+            "Cloud_Full_TestUnseen.csv"]
 location_names = ["Cotopaxi", "Kilauea", "Lastarria", "Merapi", "Reventador"]
 def map_image_name_to_volcano_name(image_name):
     if "Cotopaxi" in image_name:
@@ -39,11 +39,16 @@ def calculate_metrics(dataframe):
     #Calculate location split
     dataframe["volcano_name"] = dataframe["image_name"].apply(map_image_name_to_volcano_name)
     location_count_strings = []
+    location_counts_numeric = []
     for location in location_names:
         location_samples = dataframe[dataframe["volcano_name"]==location]
+        location_counts_numeric.append(location_samples.shape[0])
         location_count_string = str(location_samples.shape[0])
         location_count_strings.append(location_count_string)
     all_location_counts = ":".join(location_count_strings)
+    #Sense check that location counts sum to the total number of samples
+    if sum(location_counts_numeric) != n:
+        print("Error in location sample counts!")
 
     #Calculate percentage obscured samples
     obscured_samples = dataframe[dataframe[target_name]=="Yes"]

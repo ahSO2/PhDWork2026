@@ -5,7 +5,7 @@ import pandas as pd
 target = "precipitation"
 zooniverse_labels_path = "FinalZooniverseExports/precipitation-labelling-classifications.csv"
 my_existing_labels_path = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/UpdatedCorrectedDataframes/AllCorrectedChunkandIndivLabels.xlsx"
-model_predictions_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs/ManualLabellingVariation/SelectedSamplesForLabelling_Batch1_PrecipIndex.xlsx"
+model_predictions_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/ManualLabellingVariation/SelectedSamplesForLabelling_Batch1_PrecipIndex.xlsx"
 
 base_df = pd.read_excel(model_predictions_path)
 my_labels_df = pd.read_excel(my_existing_labels_path)
