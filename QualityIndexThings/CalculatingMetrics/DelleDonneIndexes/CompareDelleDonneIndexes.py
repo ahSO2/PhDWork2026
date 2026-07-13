@@ -9,8 +9,8 @@ import pandas as pd
 import seaborn as sns
 
 df_type = "excel"
-indexes_df_path = "IndexValues/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx"
-results_save_path = "EvalandCompareResults/Lastarria_AllSamples_Unbalanced_ThresholdChoice.csv"
+indexes_df_path = "IndexValues/AfterModelRetraining/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx"
+results_save_path = "EvalandCompareResults_RetrainedPrecipModel/Lastarria_AllSamples_Unbalanced_ThresholdChoice.csv"
 figure_save_name = "LastarriaOptimalThresholdFigure_Custom.jpg"
 original_thresh_v = 4
 original_thresh_c = -0.5
@@ -69,14 +69,23 @@ def plot_indexes_w_threshold(df_to_plot, thresh_v_to_plot, thresh_c_to_plot):
     markers = {"Yes": "s", "No": "o"}
     s = sns.scatterplot(data=df_to_plot, y="visibility_index", x="correlation_index", hue="Obscurance Level",
                     hue_order=["No", "Minor", "Not Calc", "In Calc", "Very"], style="Obscurance", markers=markers,
-                    palette=custom, alpha=0.65, s=20, ax=ax, linewidth=0, edgecolor="black")
+                    palette=custom, alpha=0.65, s=15, ax=ax, linewidth=0, edgecolor="black")
     #plt.legend(title="Obscurance Level")
-    plt.legend()
+    #plt.legend(bbox)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.7, box.height * 0.7])
+    leg = ax.legend(loc='center left', bbox_to_anchor=(1, 0.75))
+    for item, label in zip(leg.legend_handles, leg.texts):
+        if label._text == "Obscurance Level":
+            label._text = r"$\bf{Obscurance \: \: Level}$"
+        elif label._text == "Obscurance":
+            label._text = r"$\bf{Obscurance}$"
+
     ax.axvline(x=thresh_c_to_plot, linestyle="--", color="black")
     ax.axhline(y=thresh_v_to_plot, linestyle="--", color="black")
     # ax.set_title("Physics-based Indexes For Labelled Lastarria Data", fontsize=15)
-    ax.set_xlabel("Correlation Index", fontsize=15)
-    ax.set_ylabel("Visibility Index", fontsize=15)
+    ax.set_xlabel("Correlation Index", fontsize=12)
+    ax.set_ylabel("Visibility Index", fontsize=12)
 
     visibility_values = df_to_plot["visibility_index"]
     correlation_values = df_to_plot["correlation_index"]
@@ -85,12 +94,12 @@ def plot_indexes_w_threshold(df_to_plot, thresh_v_to_plot, thresh_c_to_plot):
     thresh_v_prop = (thresh_v_to_plot - visibility_values.min())/visibility_range
     thresh_c_prop = (thresh_c_to_plot - correlation_values.min())/correlation_range
 
-    ax.annotate("correlation = " + str(thresh_c_to_plot), xy=(thresh_c_prop, 0.95), rotation=90, xycoords = 'axes fraction', xytext = (-35, 0), textcoords = 'offset pixels', verticalalignment='top',
-                bbox=dict(fc="white", ec="white", lw=0, alpha=0.7))
-    ax.annotate("visibility = " + str(thresh_v_to_plot), xy=(0.95, thresh_v_prop), rotation=0, xycoords='axes fraction', xytext=(0, 60),
-                textcoords='offset pixels', horizontalalignment="right", bbox=dict(fc="white", ec="white", lw=0, alpha=0.7))
+    ax.annotate("correlation = " + str(thresh_c_to_plot), xy=(thresh_c_prop, 1.05), rotation=0, xycoords = 'axes fraction', xytext = (-250, 0), textcoords = 'offset pixels', verticalalignment='top',
+                bbox=dict(fc="white", ec="white", lw=0, alpha=0.7), fontsize=9)
+    ax.annotate("visibility = " + str(thresh_v_to_plot), xy=(1.25, thresh_v_prop), rotation=0, xycoords='axes fraction', xytext=(0, 30),
+                textcoords='offset pixels', horizontalalignment="right", bbox=dict(fc="white", ec="white", lw=0, alpha=0.7), fontsize=9)
 
-    plt.savefig(results_save_path.split("/")[0] + "/" + figure_save_name, dpi=300)
+    plt.savefig(results_save_path.split("/")[0] + "/" + figure_save_name, dpi=600)
     plt.show()
 
 

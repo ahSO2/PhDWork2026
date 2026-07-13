@@ -141,10 +141,10 @@ def AUC_PR(target, predicted_sigmoid):
 All final values are rounded to 4dp.'''
 
 np.random.seed(42)
-results_dataframe_path = "MergedLabels/consensus_calc_precipitation.xlsx"
-predict = "precipitation"
-#predict = "obs_cloud"
-outputs_save_path = "CalculatedMetricsSheets/" + predict + "sample_set.xlsx"
+results_dataframe_path = "MergedLabels_WUpdatedModelPredictions/consensus_calc_obs_cloud.xlsx"
+#predict = "precipitation"
+predict = "obs_cloud"
+outputs_save_path = "CalculatedMetricsSheets_WUpdatedModelPredictions/" + predict + "sample_set.xlsx"
 labellers = ["AH", "TW", "TP", "majority_vote"]
 
 ##########################################################################

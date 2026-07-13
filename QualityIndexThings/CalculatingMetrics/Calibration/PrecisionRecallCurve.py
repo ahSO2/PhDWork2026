@@ -9,10 +9,11 @@ from sklearn.metrics import precision_recall_curve
 #UNOBSCURED DATA. Threshold values output by the sklearn function
 #will be relative to this inverted setup.
 
-predictions_df_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/Precipitation_Full_TestSeen.xlsx"
+predictions_df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen.xlsx"
 predictions_df = pd.read_excel(predictions_df_path)
-target = "precipitation"
-save_folder = "PrecisionRecallCurves/"
+#predictions_df = predictions_df[predictions_df["volcano_name"]!="Kilauea"]
+target = "obs_cloud"
+save_folder = "PrecisionRecallCurves/RetrainedModels/"
 
 def map_YN_to_binary(value):
     if value == "Yes":
@@ -43,7 +44,7 @@ ax.plot(corresponding_thresholds, precisions[:-1], label="precision")
 ax.plot(corresponding_thresholds, recalls[:-1], label="recall")
 ax.set_xlabel("Threshold", fontsize=14)
 ax.set_ylabel("Precision/Recall", fontsize=14)
-plt.legend()
+plt.legend(fontsize=14)
 plt.savefig(save_folder + "/PRvsThreshold_" + predictions_df_path.split("/")[-1][:-5] + ".jpg", dpi=300)
 plt.show()
 

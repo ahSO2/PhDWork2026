@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 
-results_df = pd.read_excel("MergedLabels/consensus_calc_precipitation.xlsx")
-target = "precipitation"
-save_path = "CalculatedMetricsSheets/" + target + "_binary_agreement_percentages.xlsx"
+results_df = pd.read_excel("MergedLabels_WUpdatedModelPredictions/consensus_calc_obs_cloud.xlsx")
+target = "obs_cloud"
+save_path = "CalculatedMetricsSheets_WUpdatedModelPredictions/" + target + "_binary_agreement_percentages.xlsx"
 
 locations = ["All", "Cotopaxi", "Kilauea", "Lastarria", "Merapi", "Reventador"]
 

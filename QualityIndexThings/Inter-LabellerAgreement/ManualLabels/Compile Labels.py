@@ -2,21 +2,13 @@
 #my label, TW label, TP label, and my model predictions.
 import pandas as pd
 
-target = "precipitation"
-zooniverse_labels_path = "FinalZooniverseExports/precipitation-labelling-classifications.csv"
-my_existing_labels_path = "C:/Users/ggp24ash/PycharmProjects/MLforQualityClass/ChunkLabelsSet/UpdatedCorrectedDataframes/AllCorrectedChunkandIndivLabels.xlsx"
-model_predictions_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/ManualLabellingVariation/SelectedSamplesForLabelling_Batch1_PrecipIndex.xlsx"
+target = "obs_cloud"
+zooniverse_labels_path = "FinalZooniverseExports/cloud-labelling-classifications.csv"
+model_predictions_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/SelectedSamplesForLabelling_Batch1_CloudIndex.xlsx"
 
 base_df = pd.read_excel(model_predictions_path)
-my_labels_df = pd.read_excel(my_existing_labels_path)
 zooniverse_labels = pd.read_csv(zooniverse_labels_path)
 
-#Merge the base df with my labels
-#my_labels_selected_columns = my_labels_df[["image_name", "on_lens_level", "cloud_level"]]
-#base_plus_my_labels = pd.merge(base_df, my_labels_selected_columns, left_on='image_name', right_on='image_name', how='left')
-#base_plus_my_labels.rename({"on_lens_level":"precipitation_level_AH", "cloud_level":"obs_cloud_level_AH"}, inplace=True)
-#base_plus_my_labels.drop(["on_lens_level_y", "on_lens_level_x", "cloud_level"])
-#print(base_plus_my_labels.columns)
 
 #Actually my selected samples dataframes already had my labels saved
 if target == "precipitation":
@@ -60,6 +52,6 @@ all_annotator_labels.rename(columns={"annotator_level":target+"_level_TW"}, inpl
 print(all_annotator_labels.columns)
 all_annotator_labels = pd.merge(all_annotator_labels, TP_labels, left_on='image_name', right_on='image_name', how='left')
 all_annotator_labels.rename(columns={"annotator_level":target+"_level_TP"}, inplace=True)
-all_annotator_labels.to_excel("MergedLabels/" + "merged_" + target + ".xlsx")
+all_annotator_labels.to_excel("MergedLabels_WUpdatedModelPredictions/" + "merged_" + target + ".xlsx")
 
 

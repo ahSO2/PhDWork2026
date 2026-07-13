@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.calibration import calibration_curve, CalibrationDisplay
 
-predictions_df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/Precipitation_Full_TestSeen.xlsx"
+predictions_df_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestUnseen.xlsx"
 predictions_df = pd.read_excel(predictions_df_path)
-target = "precipitation"
+target = "obs_cloud"
 save_folder = "ReliabilityDiagrams/"
 n_bins = 15
 def map_YN_to_binary(value):
@@ -124,5 +124,5 @@ ax.set_xlabel("Mean Sigmoid Score", fontsize=16)
 ax.set_ylabel("Proportion of Positives", fontsize=16)
 ax.tick_params(axis='both', which='major', labelsize=12)
 plt.legend(fontsize=16)
-plt.savefig(save_folder + "Target" + target + "_" + predictions_df_path.split("/")[-1][:-5] + ".jpg", dpi=300)
+#plt.savefig(save_folder + "Target" + target + "_" + predictions_df_path.split("/")[-1][:-5] + ".jpg", dpi=300)
 plt.show()

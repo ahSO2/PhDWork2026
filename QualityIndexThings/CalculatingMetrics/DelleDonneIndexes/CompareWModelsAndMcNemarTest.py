@@ -142,12 +142,12 @@ def map_correctness_to_McNemar_vals(row):
     elif CNN_correct == False and DD_correct == False:
         return "d"
 
-indexes_df_path = "IndexValues/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx"
+indexes_df_path = "IndexValues/AfterModelRetraining/Lastarria_AllSamples_Unbalanced_QualityIndexes.xlsx"
 DD_thresh_v = 3.1
 DD_thresh_v_OG = 4
 DD_thresh_c = -0.4
 DD_thresh_c_OG = -0.5
-results_folder = "EvalAndCompareResults/"
+results_folder = "EvalAndCompareResults_RetrainedPrecipModel"
 np.random.seed(42) #For reproducibility of the bootstrap CIs
 
 if ".csv" in indexes_df_path:

@@ -23,10 +23,10 @@ import VolcanoesDictionaryForQualityModels
 #calculated (and included in the first submission to Frontiers before peer reviews).
 
 file_type = "excel"
-data_names_path = "/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_Original/Lastarria_AllSamples_Unbalanced.xlsx"
+data_names_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/Lastarria_AllSamples_Unbalanced.xlsx"
 data_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/MainDataset/"
 sensor_mark_masks_path = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Data_Updated23rdJune26/SensorMarkMasks/"
-save_folder = "IndexValues/"
+save_folder = "IndexValues/AfterModelRetraining/"
 flank_masks_path = "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"
 def mask_sensor_marks(image, mask_path):
     if mask_path == "None":

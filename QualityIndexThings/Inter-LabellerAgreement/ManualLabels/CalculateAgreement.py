@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-merged_labels = pd.read_excel("MergedLabels/merged_precipitation.xlsx")
-target = "precipitation"
+merged_labels = pd.read_excel("MergedLabels_WUpdatedModelPredictions/merged_obs_cloud.xlsx")
+target = "obs_cloud"
 labellers = ["AH", "TW", "TP"]
 
 def map_level_to_binary(level):
@@ -81,4 +81,4 @@ merged_labels[target + "_binary_majority_vote"] = merged_labels.apply(calculate_
 merged_labels[target + "_level_numeric_majority_vote"] = merged_labels.apply(calculate_target_level_numeric_majority_vote, axis=1)
 merged_labels[target + "_level_majority_vote"] = merged_labels[target + "_level_numeric_majority_vote"].apply(map_numeric_to_level)
 
-merged_labels.to_excel("MergedLabels/consensus_calc_" + target + ".xlsx")
+merged_labels.to_excel("MergedLabels_WUpdatedModelPredictions/consensus_calc_" + target + ".xlsx")
