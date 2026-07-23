@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 results_df = pd.read_excel("MergedLabels_WUpdatedModelPredictions/consensus_calc_obs_cloud.xlsx")
+#results_df = results_df[~results_df["image_name"].str.contains("Kilauea")]
 target = "obs_cloud"
 save_path = "CalculatedMetricsSheets_WUpdatedModelPredictions/" + target + "_binary_agreement_percentages.xlsx"
 

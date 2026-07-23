@@ -128,24 +128,25 @@ def F1_Score(target, predicted):
         return np.round(f1, 4)
 
 def AUC_PR(target, predicted_sigmoid):
-    precisions, recalls, thresholds = precision_recall_curve(target, predicted_sigmoid)
+    '''Considering the 0=unobscured class as positive.'''
+    print(np.unique(target))
+    predicted_sigmoid_inverse = 1 - predicted_sigmoid
+    target_inverse = 1 - target
+    precisions, recalls, thresholds = precision_recall_curve(y_true=target_inverse, y_score=predicted_sigmoid_inverse)
     auc_val = auc(recalls, precisions)
     return np.round(auc_val, 4), np.round(precisions, 4), np.round(recalls,4), thresholds
-
 
 '''Random seed is set for reproducibility of bootstrapping. 
 All final values are rounded to 4dp.'''
 
 np.random.seed(42)
-results_dataframe_paths = ["FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TrainExpanded.xlsx",
-                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_Valid.xlsx",
-                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen.xlsx",
-                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen_ExcludingKilauea.xlsx",
-                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestSeen_KilaueaOnly.xlsx",
-                           "FinalModelsApplicationOutputs_RetrainedPrecipModel/Cloud_Full_TestUnseen.xlsx"]
-#predict = "precipitation"
-predict = "obs_cloud"
-outputs_save_path = "CalculatedMetricsSheets/Cloud_Full_Re-trainedModels.xlsx"
+results_dataframe_paths = ["CVModelsApplicationOutputs_Original/Precipitation_CV_loCotopaxi_TestUnseen.xlsx",
+                           "CVModelsApplicationOutputs_Original/Precipitation_CV_loKilauea_TestUnseen.xlsx",
+                           "CVModelsApplicationOutputs_Original/Precipitation_CV_loMerapi_TestUnseen.xlsx",
+                           "CVModelsApplicationOutputs_Original/Precipitation_CV_loReventador_TestUnseen.xlsx",]
+predict = "precipitation"
+#predict = "obs_cloud"
+outputs_save_path = "CalculatedMetricsSheets/Precipitation_CrossValid_TestUnseen_Original.xlsx"
 
 ##########################################################################
 outputs_df = pd.DataFrame(columns=["set_name", "ACC", "ACC_L95", "ACC_U95",

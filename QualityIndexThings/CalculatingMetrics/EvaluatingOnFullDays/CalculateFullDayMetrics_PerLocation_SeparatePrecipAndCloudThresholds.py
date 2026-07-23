@@ -140,8 +140,11 @@ def F1_Score(target, predicted):
         return np.round(f1, 4)
 
 def AUC_PR(target, predicted_sigmoid):
+    '''Considering the 0=unobscured class as positive.'''
     print(np.unique(target))
-    precisions, recalls, thresholds = precision_recall_curve(y_true=target, y_score=predicted_sigmoid)
+    predicted_sigmoid_inverse = 1 - predicted_sigmoid
+    target_inverse = 1 - target
+    precisions, recalls, thresholds = precision_recall_curve(y_true=target_inverse, y_score=predicted_sigmoid_inverse)
     auc_val = auc(recalls, precisions)
     return np.round(auc_val, 4), np.round(precisions, 4), np.round(recalls,4), thresholds
 
@@ -217,18 +220,19 @@ All final values are rounded to 4dp.'''
 np.random.seed(42)
 full_days_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/FullDays/"
 #predict = "precipitation"
-predict = "obs_cloud"
-#predict = "obscurance"
-threshold = 0.9372
+#predict = "obs_cloud"
+predict = "obscurance"
+precip_threshold = 0.4123
+cloud_threshold = 0.0473
 locations = ["Cotopaxi", "Kilauea", "Lastarria", "Merapi", "Reventador"]
-outputs_save_path = "FullDays_" + predict + "_EvalByLocation_Threshold_" + str(threshold) + ".xlsx"
+outputs_save_path = "FullDays_" + predict + "_EvalByLocation_Threshold_" + "PT" + str(precip_threshold) + "CT" + str(cloud_threshold) + ".xlsx"
 
 ##########################################################################
 outputs_df = pd.DataFrame(columns=["location", "threshold", "ACC", "ACC_L95", "ACC_U95",
                                    "BACC", "BACC_L95", "BACC_U95",
                                    "PP", "PN", "RP", "RN", "R_No", "R_Minor",
                                    "R_NotCalc", "R_InCalc", "R_Very",
-                                   "F1", "AUC_PR"])
+                                   "F1"])
 full_days_dfs = []
 for sheet_name in os.listdir(full_days_path):
     print(sheet_name)
@@ -241,18 +245,18 @@ all_data = all_data[all_data["other"]!="Yes"]
 print(all_data.shape)
 all_data.reset_index(inplace=True)
 
+#Calculate the obscurance level (true)
+all_data["precipitation_level_numeric"] = all_data["precipitation_level"].apply(map_level_to_numeric)
+all_data["obs_cloud_level_numeric"] = all_data["obs_cloud_level"].apply(map_level_to_numeric)
+all_data["obscurance_level_numeric"] = all_data[["precipitation_level_numeric", "obs_cloud_level_numeric"]].max(axis=1)
+all_data["obscurance_level"] = all_data["obscurance_level_numeric"].apply(map_numeric_to_level)
+#Calculate the obscurance YN (true)
+all_data["obscurance"] = all_data["obscurance_level"].apply(map_level_to_YN)
 
-
-if predict == "obscurance":
-    #Calculate the obscurance level (true)
-    all_data["precipitation_level_numeric"] = all_data["precipitation_level"].apply(map_level_to_numeric)
-    all_data["obs_cloud_level_numeric"] = all_data["obs_cloud_level"].apply(map_level_to_numeric)
-    all_data["obscurance_level_numeric"] = all_data[["precipitation_level_numeric", "obs_cloud_level_numeric"]].max(axis=1)
-    all_data["obscurance_level"] = all_data["obscurance_level_numeric"].apply(map_numeric_to_level)
-    #Calculate the obscurance YN (true)
-    all_data["obscurance"] = all_data["obscurance_level"].apply(map_level_to_YN)
-    #Calculate the obscurance prediction (max of cloud and precip sigmoid values)
-    all_data["obscurance_prediction"] = all_data[["precipitation_prediction", "obs_cloud_prediction"]].max(axis=1)
+#Calculate the obscurance prediction (true if either cloud or precip is predicted)
+all_data["precipitation_prediction_binary"] = threshold_to_binary(all_data["precipitation_prediction"], threshold=precip_threshold)
+all_data["obs_cloud_prediction_binary"] = threshold_to_binary(all_data["obs_cloud_prediction"], threshold=cloud_threshold)
+all_data["obscurance_prediction_binary"] = all_data[["precipitation_prediction_binary", "obs_cloud_prediction_binary"]].max(axis=1)
 
 for location in locations:
     location_data = all_data[all_data["image_name"].str.contains(location)]
@@ -260,19 +264,19 @@ for location in locations:
         target_YN = location_data[predict]
         target_level = location_data[predict + "_level"].to_numpy()
         target_binary = target_YN.apply(map_YN_to_binary).to_numpy()
-        prediction_sigmoid = location_data[predict + "_prediction"].to_numpy()
+        #prediction_sigmoid = location_data[predict + "_prediction"].to_numpy()
 
         #Threshold and calculate the metrics which use this threshold
-        prediction_thresh = threshold_to_binary(prediction_sigmoid, threshold)
+        prediction_thresh = location_data[predict + "_prediction_binary"].to_numpy()
         acc, acc_l95, acc_u95 = accuracy_w_bootstrapCI(target_binary, prediction_thresh)
         bacc, bacc_l95, bacc_u95 = balanced_accuracy_w_bootstrapCI(target_binary, prediction_thresh)
         binary_precisions, subclass_recalls, binary_recalls = precision_recall_per_class(target_binary, prediction_thresh, target_level)
         f1 = F1_Score(target_binary, prediction_thresh)
-        auc_pr, precisions, recalls, thresholds = AUC_PR(target=target_binary, predicted_sigmoid=prediction_sigmoid)
+        #auc_pr, precisions, recalls, thresholds = AUC_PR(target=target_binary, predicted_sigmoid=prediction_sigmoid)
 
         #For the given dataset - save all these metrics:
         new_row = {"location":location,
-               "threshold":threshold,
+               "threshold":"PT" + str(precip_threshold) + "CT" + str(cloud_threshold),
                "ACC":acc,
                "ACC_L95":acc_l95,
                "ACC_U95":acc_u95,
@@ -289,7 +293,7 @@ for location in locations:
                "R_InCalc":subclass_recalls[3],
                "R_Very":subclass_recalls[4],
                "F1":f1,
-               "AUC_PR":auc_pr}
+               "AUC_PR":np.nan}
         outputs_df.loc[len(outputs_df)] = new_row
 
 #######Now additionally calculate metrics balanced by (taking the mean over) locations
@@ -298,13 +302,12 @@ for location in locations:
 target_YN = all_data[predict]
 target_level = all_data[predict + "_level"]
 target_binary = target_YN.apply(map_YN_to_binary).to_numpy()
-prediction_sigmoid = all_data[predict + "_prediction"].to_numpy()
-prediction_thresh = threshold_to_binary(prediction_sigmoid, threshold)
+prediction_thresh = all_data[predict + "_prediction_binary"]
 location_balanced_BA, LBBACC_Lower, LBBACC_Upper = location_balanced_BA_wBootstrapCI(target_binary, prediction_thresh, all_data["image_name"], locations)
 
 #For other metrics, just take the mean over the location rows
 location_means_row = {"location":"Location_Means",
-                      "threshold":threshold,
+                      "threshold":"PT" + str(precip_threshold) + "CT" + str(cloud_threshold),
                       "BACC":location_balanced_BA,
                       "BACC_L95":LBBACC_Lower,
                       "BACC_U95":LBBACC_Upper,
@@ -318,8 +321,8 @@ location_means_row = {"location":"Location_Means",
                       "R_InCalc": outputs_df["R_InCalc"].mean(),
                       "R_Very": outputs_df["R_Very"].mean(),
                       "F1": outputs_df["F1"].mean(),
-                      "AUC_PR":outputs_df["AUC_PR"].mean()
+                      "AUC_PR":np.nan
                       }
 outputs_df.loc[len(outputs_df)] = location_means_row
 outputs_df.to_excel(outputs_save_path)
-all_data.to_csv("FullDays_StdThreshold_OverallObsPredictions.csv")
+all_data.to_csv("FullDays_SeparateLowerThresholds_OverallObsPredictions.csv")

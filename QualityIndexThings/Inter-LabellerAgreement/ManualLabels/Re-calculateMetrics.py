@@ -132,7 +132,11 @@ def F1_Score(target, predicted):
         return np.round(f1, 4)
 
 def AUC_PR(target, predicted_sigmoid):
-    precisions, recalls, thresholds = precision_recall_curve(target, predicted_sigmoid)
+    '''Considering the 0=unobscured class as positive.'''
+    print(np.unique(target))
+    predicted_sigmoid_inverse = 1 - predicted_sigmoid
+    target_inverse = 1 - target
+    precisions, recalls, thresholds = precision_recall_curve(y_true=target_inverse, y_score=predicted_sigmoid_inverse)
     auc_val = auc(recalls, precisions)
     return np.round(auc_val, 4), np.round(precisions, 4), np.round(recalls,4), thresholds
 
@@ -141,9 +145,9 @@ def AUC_PR(target, predicted_sigmoid):
 All final values are rounded to 4dp.'''
 
 np.random.seed(42)
-results_dataframe_path = "MergedLabels_WUpdatedModelPredictions/consensus_calc_obs_cloud.xlsx"
-#predict = "precipitation"
-predict = "obs_cloud"
+results_dataframe_path = "MergedLabels_WUpdatedModelPredictions/consensus_calc_precipitation.xlsx"
+predict = "precipitation"
+#predict = "obs_cloud"
 outputs_save_path = "CalculatedMetricsSheets_WUpdatedModelPredictions/" + predict + "sample_set.xlsx"
 labellers = ["AH", "TW", "TP", "majority_vote"]
 
