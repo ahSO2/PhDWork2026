@@ -4,7 +4,7 @@ import matplotlib.dates as md
 import numpy as np
 import pandas as pd
 
-day_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/FullDays/Merapi_2023-09-09.xlsx"
+day_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/FullDays/Reventador_2025-07-14.xlsx"
 df = pd.read_excel(day_path)
 def map_image_name_to_time(image_name):
     date_str = image_name.split("_")[1][0:10]

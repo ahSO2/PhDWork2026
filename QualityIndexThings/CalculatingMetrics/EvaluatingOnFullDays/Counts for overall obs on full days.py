@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-all_data = pd.read_csv("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/EvaluatingOnFullDays/FullDays_StdThreshold_OverallObsPredictions.csv")
+all_data = pd.read_csv("FullDays_StdThreshold_OverallObsPredictions.csv")
 
 locations = ["Cotopaxi", "Kilauea", "Lastarria", "Merapi", "Reventador", "All"]
 

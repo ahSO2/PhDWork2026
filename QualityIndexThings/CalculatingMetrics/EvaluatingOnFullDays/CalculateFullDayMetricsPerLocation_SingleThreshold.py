@@ -225,10 +225,10 @@ All final values are rounded to 4dp.'''
 
 np.random.seed(42)
 full_days_path = "C:/Users/ggp24ash/PycharmProjects/PhDWork2026/QualityIndexThings/CalculatingMetrics/FinalModelsApplicationOutputs_RetrainedPrecipModel/FullDays/"
-predict = "precipitation"
-predict = "obs_cloud"
-#predict = "obscurance"
-threshold = 0.9372
+#predict = "precipitation"
+#predict = "obs_cloud"
+predict = "obscurance"
+threshold = 0.5
 locations = ["Cotopaxi", "Kilauea", "Lastarria", "Merapi", "Reventador"]
 outputs_save_path = "FullDays_" + predict + "_EvalByLocation_Threshold_" + str(threshold) + ".xlsx"
 
@@ -331,4 +331,4 @@ location_means_row = {"location":"Location_Means",
                       }
 outputs_df.loc[len(outputs_df)] = location_means_row
 outputs_df.to_excel(outputs_save_path)
-#all_data.to_csv("FullDays_StdThreshold_OverallObsPredictions.csv")
+all_data.to_csv("FullDays_StdThreshold_OverallObsPredictions.csv")

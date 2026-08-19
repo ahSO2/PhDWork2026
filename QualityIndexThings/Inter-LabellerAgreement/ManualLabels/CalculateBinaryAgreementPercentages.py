@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 
 results_df = pd.read_excel("MergedLabels_WUpdatedModelPredictions/consensus_calc_obs_cloud.xlsx")
-#results_df = results_df[~results_df["image_name"].str.contains("Kilauea")]
+results_df = results_df[~results_df["image_name"].str.contains("Kilauea")]
 target = "obs_cloud"
-save_path = "CalculatedMetricsSheets_WUpdatedModelPredictions/" + target + "_binary_agreement_percentages.xlsx"
+save_path = "CalculatedMetricsSheets_WUpdatedModelPredictions/" + target + "_ExclKilauea_binary_agreement_percentages.xlsx"
 
 locations = ["All", "Cotopaxi", "Kilauea", "Lastarria", "Merapi", "Reventador"]
 
@@ -18,5 +18,5 @@ for location in locations:
     else:
         location_data = results_df.copy()
     location_binary_agreement = np.mean(location_data[target + "_binary_consensus"].tolist())
-    outputs_df[location] = [np.round(location_binary_agreement, 4)]
+    outputs_df[location] = [np.round(location_binary_agreement, 5)]
 outputs_df.to_excel(save_path)

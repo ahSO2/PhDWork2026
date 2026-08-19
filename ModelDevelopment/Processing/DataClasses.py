@@ -1,3 +1,5 @@
+import pandas as pd
+
 from BackgroundMethods import *
 import cv2
 from datetime import datetime, timedelta
@@ -18,12 +20,18 @@ def map_image_name_to_time(image_name):
     datetime_obj = datetime(int(date_str[0:4]), int(date_str[5:7]), int(date_str[8:10]), int(time_str[:2]), int(time_str[2:4]), int(time_str[4:]))
     return datetime_obj
 
+def map_spectrometer_timestamp_to_datetime(timestamp):
+    date_str = timestamp[0:10]
+    time_str = timestamp[-8:]
+    datetime_obj = datetime(int(date_str[0:4]), int(date_str[5:7]), int(date_str[8:10]), int(time_str[:2]), int(time_str[3:5]), int(time_str[6:]))
+    return datetime_obj
+
 def shutter_speed_from_band_img_name(image_name):
     return int(image_name.split("_")[3][:-2])
 
 def mask_sensor_marks(image, mask):
     '''Take in a float image, create an 8-bit copy, and calculate the masked values.
-    Infill the folat image using these claculated values.'''
+    Infill the float image using these calculated values.'''
     scale_factor = 255/np.max(image)
     image_8bit = (image * scale_factor).astype(np.uint8)
     infilled_8bit = cv2.inpaint(image_8bit, mask, 5, cv2.INPAINT_TELEA)
@@ -56,6 +64,24 @@ def correct_sample(bandA, bandB, dark_name_A, dark_name_B, vin_mask_A, vin_mask_
 
     return bandA, bandB
 
+def calculate_AA(bandA_images, bandB_images, backgrounds_A, backgrounds_B):
+    '''Given lists of 310 and 330nm image samples, and corresponding background estimations,
+    calulate the apparent absorbance and return in the form of a list. Mask out any areas of
+    the image or background image equal to zero, (and return zero value for these pixels)
+    to avoid error in log function.'''
+    array_A = np.array(bandA_images)
+    array_B = np.array(bandB_images)
+    masked_array_A = np.ma.masked_where(array_A == 0, array_A)
+    masked_array_B = np.ma.masked_where(array_B == 0, array_B)
+    bg_array_A = np.array(backgrounds_A)
+    bg_array_B = np.array(backgrounds_B)
+    masked_backgrounds_A = np.ma.masked_where(bg_array_A == 0, bg_array_A)
+    masked_backgrounds_B = np.ma.masked_where(bg_array_B == 0, bg_array_B)
+    tau_A = -1 * np.ma.log(np.ma.divide(masked_array_A, masked_backgrounds_A))
+    tau_B = -1 * np.ma.log(np.ma.divide(masked_array_B, masked_backgrounds_B))
+    AA_seq = tau_A - tau_B
+    return AA_seq.tolist()
+
 class Sequence():
     '''Class representing a sequence of data to be processed.'''
     def __init__(self):
@@ -65,13 +91,14 @@ class Sequence():
         self.batch_bandB = []
         self.bgs_A = []
         self.bgs_B = []
+        self.AA = []
 
 
     def set_volcano_dictionary(self, dictionary):
         self.volc_dict = dictionary
 
     def read_and_match(self, directory_path, correct=True):
-        '''Read all sample names from the given directory. Procuce a list
+        '''Read all sample names from the given directory. Produce a list
         of band A samples, matched to corresponding bandB samples.
         If correct is True, match names of files for dark and vignette correction,
         then initialse the registration transform, using the data from the volcano dictionary.'''
@@ -194,9 +221,8 @@ class Sequence():
 
     def iterate(self, b, chunk_size_m=30):
         '''Return the first 30mins (or specified time period) of the sequence, then
-        incrementally return images in range [15mins + dt_b, 30mins + dt_b].
-        Where dt_b denotes the timestep difference between the last image
-        returned in the previous batch and the next sample.
+        incrementally return a batch containing the next image and all samples within
+        the previous 30mins.
 
         This function assumes that at least chunk_size mins of consecutive recordings are provided.
         The function is written such that we step forward to include one new image each batch.
@@ -302,20 +328,51 @@ class Sequence():
             if extra_count > 0:
                 self.bgs_A = self.bgs_A[extra_count:]
                 self.bgs_B = self.bgs_B[extra_count:]
-            #TODO check this is working as intended
 
-        def calculate_absorbance(self, b):
-            #TODO
-            '''Calculate the absorbance for the current batch of data.'''
-            #If batch is zero, calculate for whole batch,
-            #If batch is 1, calculate just for the last image
-            pass
+    def calculate_absorbance(self, b):
+        '''Calculate the absorbance for the current batch of data, assuming background images have been estimated.'''
+        # If batch is zero, calculate for whole batch:
+        if b == 0:
+            self.AA = calculate_AA(self.batch_bandA, self.batch_bandB, self.bgs_A, self.bgs_B)
 
-        def translate_absorbance(self):
-            #TODO
-            '''Calibrate the absorbance images such that the median in a specific region
-            e.g. the flank is zero, using simple subtraction.'''
-            pass
+        #If this is not he first batch, calculate just for the last image:
+        else:
+            # Calculate and append the absorbance for the new image
+            AA_new = calculate_AA(self.batch_bandA[-1], self.batch_bandB[-1], self.bgs_A[-1], self.bgs_B[-1])
+            self.AA.append(AA_new)
+
+            # Drop any extra absorbance values from the start of the list
+            extra_count = len(self.AA) - len(self.batch_bandA)
+            if extra_count > 0:
+                self.AA = self.AA[extra_count:]
+
+    def translate_absorbance(self):
+        #TODO
+        '''Calibrate the absorbance images such that the median in a specific region
+        e.g. the flank is zero, using simple subtraction.'''
+        pass
+
+    def read_spectrometer_data(self, path):
+        '''Read the time series of spectrometer measurements from the specified
+        file path, and match to the timestamps of the images in this sequence.'''
+
+        cd_df = pd.read_csv(path)
+        #For each entry, create a datetime object
+        cd_df["datetime"] = cd_df["Time"].apply(map_spectrometer_timestamp_to_datetime)
+
+        #Select only spectrometer readings taken in-sync with camera images
+        for time in self.times:
+            #TODO Check if there's a corresponding spectrometer reading
+            #Save a record of whether the spectrometer data is available as a boolean variable
+            #TODO if so, save the column density and associated error 
+
+
+
+
+
+
+
+
 
 
 

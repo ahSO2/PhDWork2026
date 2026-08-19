@@ -65,6 +65,11 @@ Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               'sensor_marks_mask_A': "Reventador_2024A.png",
                               'sensor_marks_mask_B': "None"}
 
+Reventador_June2025_dictionary = {'volcano_dictionary_name':"ReventadorJune2025", #Defined based on 2025-07-14, and registration still holds at 2025-09-27
+                                  'volcano_name':'Reventador',
+                                  'sensor_marks_mask_A': "Reventador_2024A.png",
+                                  'sensor_marks_mask_B': "None"}
+
 Lastarria_dictionary = {'volcano_dictionary_name':"Lastarria",
                         'volcano_name':'Lastarria',
                         'sensor_marks_mask_A': "Lastarria_A.png",
@@ -126,7 +131,7 @@ Merapi_View5_dictionary = {'volcano_dictionary_name':"MerapiView5",
                            'sensor_marks_mask_B': "Merapi_5B.png"}
 
 all_dictionaries = [Cotopaxi_View2_dictionary, Cotopaxi_View3_dictionary, Cotopaxi_View4_dictionary, Kilauea_View1_dictionary, Kilauea_View2_dictionary, Reventador_2022_dictionary,
-                    Reventador_2023_dictionary, Reventador_2024_dictionary, Lastarria_dictionary, Merapi_View0_dictionary, Merapi_View1_dictionary, Merapi_View2_dictionary,
+                    Reventador_2023_dictionary, Reventador_2024_dictionary, Reventador_June2025_dictionary, Lastarria_dictionary, Merapi_View0_dictionary, Merapi_View1_dictionary, Merapi_View2_dictionary,
                     Merapi_TenthMay_dictionary, Merapi_SixteenthMay_dictionary, Merapi_TwSecondJune_dictionary, Merapi_SecondOct_dictionary, Merapi_View3_dictionary,
                     Merapi_View4_dictionary, Merapi_View5_dictionary]
 

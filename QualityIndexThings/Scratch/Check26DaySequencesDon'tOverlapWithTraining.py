@@ -8,9 +8,10 @@ def day_name_from_image_name(image_name):
     for volcano in volcano_names:
         if volcano in image_name:
             volcano_name = volcano
+    #print(volcano_name + "_" + date)
     return volcano_name + "_" + date
 
-#full_days_folder_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_UpdatedJun26/"
+#full_days_folder_path = "C:/Users/ggp24ash/Documents/Main Datasets/QualityClassification/ModelApplicToFullDays_NewDates/"
 #base_names = os.listdir(full_days_folder_path)
 #print(full_day_names)
 
@@ -18,12 +19,16 @@ def day_name_from_image_name(image_name):
 #base_set = pd.read_csv(base_set_path)
 #base_names = base_set["image_name"]
 
-base_names = ["Merapi_2023-05-30"]
+base_names = ["Kilauea_2023-10-13"]
 
 set_to_check_paths = ["C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/PrecipitationFullSplit/Precipitation_Full_TrainExpanded.csv",
                       "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/PrecipitationFullSplit/Precipitation_Full_Valid.csv",
                       "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudFullSplit/Cloud_Full_TrainExpanded.csv",
-                      "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudFullSplit/Cloud_Full_Valid.csv"]
+                      "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudFullSplit/Cloud_Full_Valid.csv",
+                      "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudCVSplits/Cloud_CV_KilaueaExtraCorrectedSamples.csv",
+                      "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/CloudCVSplits/Cloud_CV_KilaueaExtraCorrectSamples.csv",
+                      "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/PrecipitationCVSplits/Precipitation_CV_KilaueaExtraCorrectedSamples.csv",
+                      "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/ForORDA_Jun18th2026/PrecipitationCVSplits/Precipitation_CV_KilaueaExtraCorrectSamples.csv"]
 data_to_concat = []
 for set_to_check in set_to_check_paths:
     set_df = pd.read_csv(set_to_check)
