@@ -3,10 +3,11 @@ import pandas as pd
 from BackgroundMethods import *
 import cv2
 from datetime import datetime, timedelta
-import os
-
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 import numpy as np
+import os
+from scipy.stats import pearsonr
 
 def show(image, cmap="gray"):
     plt.imshow(image, cmap=cmap)
@@ -66,7 +67,7 @@ def correct_sample(bandA, bandB, dark_name_A, dark_name_B, vin_mask_A, vin_mask_
 
 def calculate_AA(bandA_images, bandB_images, backgrounds_A, backgrounds_B):
     '''Given lists of 310 and 330nm image samples, and corresponding background estimations,
-    calulate the apparent absorbance and return in the form of a list. Mask out any areas of
+    calulate the apparent absorbance and return in the form of a 3D array. Mask out any areas of
     the image or background image equal to zero, (and return zero value for these pixels)
     to avoid error in log function.'''
     array_A = np.array(bandA_images)
@@ -80,7 +81,8 @@ def calculate_AA(bandA_images, bandB_images, backgrounds_A, backgrounds_B):
     tau_A = -1 * np.ma.log(np.ma.divide(masked_array_A, masked_backgrounds_A))
     tau_B = -1 * np.ma.log(np.ma.divide(masked_array_B, masked_backgrounds_B))
     AA_seq = tau_A - tau_B
-    return AA_seq.tolist()
+
+    return AA_seq
 
 class Sequence():
     '''Class representing a sequence of data to be processed.'''
@@ -89,9 +91,10 @@ class Sequence():
         self.previous_indicies = []
         self.batch_bandA = []
         self.batch_bandB = []
+        self.spectra_exists = []
+        self.spectra = []
         self.bgs_A = []
         self.bgs_B = []
-        self.AA = []
 
 
     def set_volcano_dictionary(self, dictionary):
@@ -239,7 +242,6 @@ class Sequence():
             self.chunk_indicies = [i for i in range(len(self.times)) if self.times[i] <= self.batch_end_time]
 
             self.flank_mask = cv2.imread(self.volc_dict["flank_mask_path"], -1)
-            show(self.flank_mask)
 
         else:
             #For every batch after, step forward by one image, and select the previous 30mins of recordings
@@ -330,21 +332,28 @@ class Sequence():
                 self.bgs_B = self.bgs_B[extra_count:]
 
     def calculate_absorbance(self, b):
-        '''Calculate the absorbance for the current batch of data, assuming background images have been estimated.'''
+        '''Calculate the absorbance for the current batch of data, assuming background images have been estimated.
+        The result is stored as an array of shape [n_frames, height, width].'''
         # If batch is zero, calculate for whole batch:
         if b == 0:
             self.AA = calculate_AA(self.batch_bandA, self.batch_bandB, self.bgs_A, self.bgs_B)
+
+            show(self.AA[0,:,:], cmap="YlGnBu_r")
+            show(self.AA[10,:,:], cmap="YlGnBu_r")
 
         #If this is not he first batch, calculate just for the last image:
         else:
             # Calculate and append the absorbance for the new image
             AA_new = calculate_AA(self.batch_bandA[-1], self.batch_bandB[-1], self.bgs_A[-1], self.bgs_B[-1])
-            self.AA.append(AA_new)
+            new_template = np.empty(shape=(1, AA_new.shape[0], AA_new.shape[1]))
+            new_template[:,:,:] = AA_new
+            self.AA = np.concatenate([self.AA, new_template], axis=0)
 
             # Drop any extra absorbance values from the start of the list
-            extra_count = len(self.AA) - len(self.batch_bandA)
+            extra_count = self.AA.shape[0] - len(self.batch_bandA)
             if extra_count > 0:
-                self.AA = self.AA[extra_count:]
+                self.AA = self.AA[extra_count:,:,:]
+            show(self.AA[-1,:,:], cmap="YlGnBu_r")
 
     def translate_absorbance(self):
         #TODO
@@ -362,9 +371,80 @@ class Sequence():
 
         #Select only spectrometer readings taken in-sync with camera images
         for time in self.times:
-            #TODO Check if there's a corresponding spectrometer reading
+            #Check if there's a corresponding spectrometer reading
             #Save a record of whether the spectrometer data is available as a boolean variable
-            #TODO if so, save the column density and associated error 
+            #If so, save the column density and associated error
+            corr_reading = cd_df[cd_df["datetime"] == time]
+            if corr_reading.shape[0] == 0:
+                self.spectra_exists.append(False)
+                self.spectra.append(np.nan)
+            elif corr_reading.shape[0] == 1:
+                self.spectra_exists.append(True)
+                self.spectra.append(corr_reading["Column density"].item())
+            else:
+                print("ERROR: Multiple simultaneous spectrometer readings.")
+    def find_spectrometer_FOV(self, s=5, plot=True):
+        '''Assuming that absorbance images have been calculated and spectrometer data is
+        read in, run a cross-correlation to estimate the pixel at which the spectrometer
+        is centered.
+
+        Calculations are run for every s-th pixel (simply by selecting that pixel, no
+        downsampling or averaging is used).'''
+
+        #Create results array, with extra rows and columns to for ease of filling the downsampled results
+        correlation_vis = np.zeros((self.AA.shape[1] + s, self.AA.shape[2] + s))
+
+        for row in range(0, self.AA.shape[1], s):
+            for column in range(0, self.AA.shape[2], s):
+                absorbance_series = self.AA[:, row, column]
+                batch_spectra = self.spectra[self.chunk_indicies[0]:self.chunk_indicies[-1] + 1]
+                correlation = pearsonr(absorbance_series, batch_spectra).statistic
+                if correlation != np.nan:
+                    correlation_vis[row: row+s, column:column+s] = np.ones(shape=(s,s)) * correlation
+        #Remove the extra rows of the results array (only used for ease of coding the line above)
+        correlation_vis = correlation_vis[:self.AA.shape[1] + 1, :self.AA.shape[2] + 1]
+
+        #Select the pixel with maximum correlation and return the coordinates:
+        max_flattened_index = np.nanargmax(correlation_vis)
+        n_cols = correlation_vis.shape[1]
+        max_row = np.floor(max_flattened_index/n_cols)
+        max_column = max_flattened_index - (max_row * n_cols)
+
+        if plot == True:
+            fig, ax = plt.subplots()
+            img = ax.imshow(correlation_vis)
+            ax.set_title("Absorbance/Spectrometer CD Correlation R-value")
+            circle = plt.Circle((max_column, max_row), radius = 10)
+            ax.add_patch(circle)
+            fig.colorbar(img, ax=ax)
+            plt.show()
+        self.spec_CFOV = (max_row, max_column)
+
+    def calculate_calibration_curve(self):
+        '''Assuming that spectrometer readings have been loaded, and that the FOV
+        has been determined, calculate the calibration line using a least squares fit.
+
+        Starting with a simple linear fit: column_density = m * absorbance + c
+        '''
+
+        absorbance_inputs = self.AA[:,int(self.spec_CFOV[0]), int(self.spec_CFOV[1])]
+        spectra_target = self.spectra[self.chunk_indicies[0]:self.chunk_indicies[-1] + 1]
+        #TODO how are na or masked values in either the absorbance or the spectrometer readings being dealt with?
+        print("Testing")
+        coeffs = np.polyfit(x=absorbance_inputs, y=spectra_target, deg=1) #TODO batch sizes are mismatching after the first batch for some reason
+        line_fn = np.poly1d(coeffs)
+
+        #Plotting
+        fig, axs = plt.subplots()
+        axs.scatter(absorbance_inputs, spectra_target)
+        x_range = np.linspace(absorbance_inputs[0], absorbance_inputs[-1])
+        line_y_vals = line_fn(x_range)
+        axs.plot(x_range, line_y_vals)
+        plt.show()
+
+
+
+
 
 
 

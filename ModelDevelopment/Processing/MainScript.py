@@ -29,6 +29,8 @@ while rem > 0: #While the remaining number of batch iterations is greater than z
     batchBandA, batchBandB, rem = reventador_sequence.iterate(b=i_iter, chunk_size_m=mins)
     reventador_sequence.estimate_backgrounds(method=constant_ratio_assumption, b=i_iter)
     reventador_sequence.calculate_absorbance(b=i_iter)
+    reventador_sequence.find_spectrometer_FOV(s=60)
+    reventador_sequence.calculate_calibration_curve()
 
     i_iter += 1
 
