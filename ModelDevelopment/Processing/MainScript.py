@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from BackgroundMethods import *
 from DataClasses import *
 import numpy as np
@@ -27,11 +29,16 @@ i_iter = 0 #Batch index
 rem=1
 while rem > 0: #While the remaining number of batch iterations is greater than zero
     batchBandA, batchBandB, rem = reventador_sequence.iterate(b=i_iter, chunk_size_m=mins)
+    print(i_iter)
+    print(reventador_sequence.batch_start_time)
+    print(reventador_sequence.batch_end_time)
+    print(reventador_sequence.chunk_indicies)
     reventador_sequence.estimate_backgrounds(method=constant_ratio_assumption, b=i_iter)
     reventador_sequence.calculate_absorbance(b=i_iter)
-    reventador_sequence.find_spectrometer_FOV(s=60)
+    reventador_sequence.find_spectrometer_FOV(s=10, plot=True)
     reventador_sequence.calculate_calibration_curve()
-
+    reventador_sequence.calibrate_AA()
+    reventador_sequence.convert_molecules_to_mass()
     i_iter += 1
 
 

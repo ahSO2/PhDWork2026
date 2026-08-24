@@ -261,14 +261,14 @@ class Sequence():
                 self.batch_bandB.append(bandB)
         else:
             print("Moving batch forward by one image.")
-
-            overlapping_batch_indicies = [self.chunk_indicies[i] for i in range(0, len(self.chunk_indicies)) if (self.chunk_indicies[i] in self.previous_indicies)]
-            #Select the relevant samples which are already read in
-            self.batch_bandA = self.batch_bandA[overlapping_batch_indicies[0]: overlapping_batch_indicies[-1] + 1]
-            self.batch_bandB = self.batch_bandB[overlapping_batch_indicies[0]: overlapping_batch_indicies[-1] + 1]
-            #Then read the additional image
+            #Read the additional image
             self.batch_bandA.append(cv2.imread(self.image_directory + "/" + self.bandA_names[self.chunk_indicies[-1]], -1))
             self.batch_bandB.append(cv2.imread(self.image_directory + "/" + self.bandB_names[self.chunk_indicies[-1]], -1))
+            #Drop samples from the start of the batch
+            extra_count = len(self.batch_bandA) - len(self.chunk_indicies)
+            if extra_count > 0:
+                self.batch_bandA = self.batch_bandA[extra_count:]
+                self.batch_bandB = self.batch_bandB[extra_count:]
 
         if self.correct == True:
             if b == 0:
@@ -338,22 +338,20 @@ class Sequence():
         if b == 0:
             self.AA = calculate_AA(self.batch_bandA, self.batch_bandB, self.bgs_A, self.bgs_B)
 
-            show(self.AA[0,:,:], cmap="YlGnBu_r")
-            show(self.AA[10,:,:], cmap="YlGnBu_r")
-
         #If this is not he first batch, calculate just for the last image:
         else:
             # Calculate and append the absorbance for the new image
             AA_new = calculate_AA(self.batch_bandA[-1], self.batch_bandB[-1], self.bgs_A[-1], self.bgs_B[-1])
-            new_template = np.empty(shape=(1, AA_new.shape[0], AA_new.shape[1]))
+            new_template = np.ma.empty(shape=(1, AA_new.shape[0], AA_new.shape[1]))
             new_template[:,:,:] = AA_new
-            self.AA = np.concatenate([self.AA, new_template], axis=0)
+            new_template.mask = AA_new.mask
+            self.AA = np.ma.concatenate([self.AA, new_template], axis=0)
 
             # Drop any extra absorbance values from the start of the list
             extra_count = self.AA.shape[0] - len(self.batch_bandA)
             if extra_count > 0:
                 self.AA = self.AA[extra_count:,:,:]
-            show(self.AA[-1,:,:], cmap="YlGnBu_r")
+
 
     def translate_absorbance(self):
         #TODO
@@ -398,9 +396,11 @@ class Sequence():
             for column in range(0, self.AA.shape[2], s):
                 absorbance_series = self.AA[:, row, column]
                 batch_spectra = self.spectra[self.chunk_indicies[0]:self.chunk_indicies[-1] + 1]
-                correlation = pearsonr(absorbance_series, batch_spectra).statistic
-                if correlation != np.nan:
-                    correlation_vis[row: row+s, column:column+s] = np.ones(shape=(s,s)) * correlation
+                #Only proceed if no element of the absorbance series is masked out (i.e all absorbance values exist)
+                if np.ma.is_masked(absorbance_series) == False:
+                    correlation = pearsonr(absorbance_series, batch_spectra).statistic
+                    if correlation != np.nan:
+                        correlation_vis[row: row+s, column:column+s] = np.ones(shape=(s,s)) * correlation
         #Remove the extra rows of the results array (only used for ease of coding the line above)
         correlation_vis = correlation_vis[:self.AA.shape[1] + 1, :self.AA.shape[2] + 1]
 
@@ -429,18 +429,42 @@ class Sequence():
 
         absorbance_inputs = self.AA[:,int(self.spec_CFOV[0]), int(self.spec_CFOV[1])]
         spectra_target = self.spectra[self.chunk_indicies[0]:self.chunk_indicies[-1] + 1]
-        #TODO how are na or masked values in either the absorbance or the spectrometer readings being dealt with?
-        print("Testing")
-        coeffs = np.polyfit(x=absorbance_inputs, y=spectra_target, deg=1) #TODO batch sizes are mismatching after the first batch for some reason
+        coeffs = np.polyfit(x=absorbance_inputs, y=spectra_target, deg=1)
         line_fn = np.poly1d(coeffs)
+        self.calib_fn = line_fn
 
         #Plotting
         fig, axs = plt.subplots()
         axs.scatter(absorbance_inputs, spectra_target)
-        x_range = np.linspace(absorbance_inputs[0], absorbance_inputs[-1])
+        x_range = np.linspace(np.min(absorbance_inputs), np.max(absorbance_inputs))
         line_y_vals = line_fn(x_range)
         axs.plot(x_range, line_y_vals)
+        axs.set_xlabel("Apparent Absorbance")
+        axs.set_ylabel("Column density (molecules/cm^2)")
+        plt.title("Calibration curve")
         plt.show()
+
+    def calibrate_AA(self):
+        '''Assuming absorbance images and the calibration curve have been computed,
+        calibrate each pixel of the absorbance images, to molecules/cm^2.'''
+        self.CD = self.calib_fn(self.AA)
+
+    def convert_molecules_to_mass(self):
+        '''Convert SO2 column densities in molecules/cm^2 to kg/m^2.
+        Conversion used:
+        1 molecule cm^-2
+        = 1/6.02e23 moles cm^-2
+        = 1/6.02e23 * 64.06 g cm^-2 (Platt and Stutz, 2008, p.12)
+        = 1/6.02e23 * 64.06 * 10e-3 kg cm^-2
+        = 1/6.02e23 * 64.06 * 10e-3 * 10e4 kg m^-2
+        = 1/6.02e22 * 64.06 kg m^-2
+        '''
+        multiplier = 64.06/(6.02*10e22)
+        self.CD = self.CD * multiplier
+        show(self.CD[-1,:,:], cmap="YlGnBu_r")
+
+
+
 
 
 
