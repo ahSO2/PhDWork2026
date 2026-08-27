@@ -1,6 +1,7 @@
 import pyplis
 from geonum import GeoPoint
 
+#Following Pyplis example code:
 #https://pyplis.readthedocs.io/en/latest/examples.html#advanced-examples-for-emission-rate-analysis
 
 IMG_DIR = "C:/Users/ggp24ash/Documents/Main Datasets/Pyplis/pyplis_etna_testdata/images/"
@@ -9,8 +10,8 @@ IMG_DIR = "C:/Users/ggp24ash/Documents/Main Datasets/Pyplis/pyplis_etna_testdata
 cam_id = "ecII" #TODO does PiCam exist as one of the std camera classes
 
 # the camera filter setup
-filters = [pyplis.utils.Filter(type="on", acronym="F01"),
-            pyplis.utils.Filter(type="off", acronym="F02")]
+#filters = [pyplis.utils.Filter(type="on", acronym="F01"),
+#           pyplis.utils.Filter(type="off", acronym="F02")]
 
 # camera location and viewing direction (altitude will be retrieved
 # automatically)
@@ -23,7 +24,7 @@ geom_cam = {"lon": 15.1129, #TODO Edit all this, this is for Etna! Ask for acess
             "alt_offset": 15.0,
             "focal_length": 25e-3}  # altitude offset (above topography)
 
-cam = pyplis.setupclasses.Camera(cam_id, filter_list=filters, **geom_cam)
+cam = pyplis.setupclasses.Camera(cam_id, **geom_cam)
 
 source = pyplis.setupclasses.Source("etna")
 
@@ -31,25 +32,24 @@ source = pyplis.setupclasses.Source("etna")
 stp = pyplis.setupclasses.MeasSetup(
     base_dir=IMG_DIR,
     camera=cam,
-    source=source
-    )
+    source=source)
 
 ds = pyplis.Dataset(stp)
 
 # get on-band image list
-on_list = ds.get_list("on")
-on_list.goto_next()
-off_list = ds.get_list("off")
+#on_list = ds.get_list("on")
+#on_list.goto_next()
+#off_list = ds.get_list("off")
 
 # activate dark correction in both lists. Dark and offset image lists are
 # automatically assigned to plume on and off-band image lists on initiation
 # of the dataset object
-on_list.darkcorr_mode = False
-off_list.darkcorr_mode = False
+#on_list.darkcorr_mode = False
+#off_list.darkcorr_mode = False
 
-print("On-band list contains %d images, current image index: %d"% (on_list.nof, on_list.cfn))
+#print("On-band list contains %d images, current image index: %d"% (on_list.nof, on_list.cfn))
 
-img = on_list.current_img()
+#img = on_list.current_img()
 
 # plume distance image retrieved from MeasGeometry class...
 plume_dists = on_list.plume_dists
@@ -71,7 +71,7 @@ print("Retrieved altitude SE crater (SRTM): %s" % se_crater.altitude)
 # The following method finds the camera viewing direction based on the
 # position of the south east crater.
 new_elev, new_azim, _, basemap =\
-    meas_geometry.find_viewing_direction(pix_x=se_crater_img_pos[0],
+    ds.meas_geometry.find_viewing_direction(pix_x=se_crater_img_pos[0],
                                         pix_y=se_crater_img_pos[1],
                                         # for uncertainty estimate
                                         pix_pos_err=100,

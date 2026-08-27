@@ -18,28 +18,41 @@ Reventador_2022_dictionary = {"volcano_dictionary_name":"Reventador2022",
                               'sensor_marks_mask_B': "None",
                               'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/Reventador2022FlankMask.png"
                               }
+
+geom_data = {'cfov_azim':50, #Azimuth angle of CFOV of camera #TODO Dummy values for writing functions
+             'cfov_elev':60,  #Elevation angle of CFOV of camera (including tilt of camera during install/placement)
+             'plume_dir_azim': None #Direction of the plume (based on wind direction). If None given, assumed to be perpendicular to camera plane if not given.
+             }
+
 #Read in the image names in order, then load, correct and process batches of
 #X minutes at a time.
 reventador_sequence = Sequence()
 reventador_sequence.set_volcano_dictionary(Reventador_2022_dictionary)
 reventador_sequence.read_and_match("E:/Reventador/2022/2022-04-24/Seq_2")
 reventador_sequence.read_spectrometer_data("E:/Reventador/2022/2022-04-24/Seq_2/Processed_spec_2026-08-19T160055/doas_results_2022-04-24T170000.csv")
+#Apply quality models for the whole sequence, and save the predictions to two arrays.
+#This is run by loading batches of images at a time, to avoid overwhelming the memory.
+reventador_sequence.apply_quality_models(chunk_size=50)
+
+#Next, iterate over each image, selecting the set of images to load (based on which data is to be used to calibrate that sample)
 mins = 5
 i_iter = 0 #Batch index
 rem=1
-while rem > 0: #While the remaining number of batch iterations is greater than zero
-    batchBandA, batchBandB, rem = reventador_sequence.iterate(b=i_iter, chunk_size_m=mins)
-    print(i_iter)
-    print(reventador_sequence.batch_start_time)
-    print(reventador_sequence.batch_end_time)
-    print(reventador_sequence.chunk_indicies)
-    reventador_sequence.estimate_backgrounds(method=constant_ratio_assumption, b=i_iter)
-    reventador_sequence.calculate_absorbance(b=i_iter)
-    reventador_sequence.find_spectrometer_FOV(s=10, plot=True)
-    reventador_sequence.calculate_calibration_curve()
-    reventador_sequence.calibrate_AA()
-    reventador_sequence.convert_molecules_to_mass()
-    i_iter += 1
+#TODO iterate over each image, determining the data to load based on
+#TODO the surrounding samples needed for the calibration for that image
+#while rem > 0: #While the remaining number of batch iterations is greater than zero
+#    batchBandA, batchBandB, rem = reventador_sequence.iterate(b=i_iter, chunk_size_m=mins)
+#    print(i_iter)
+#    print(reventador_sequence.batch_start_time)
+#    print(reventador_sequence.batch_end_time)
+#    print(reventador_sequence.chunk_indicies)
+#    reventador_sequence.estimate_backgrounds(method=constant_ratio_assumption, b=i_iter)
+#    reventador_sequence.calculate_absorbance(b=i_iter)
+#    reventador_sequence.find_spectrometer_FOV(s=10, plot=True)
+#    reventador_sequence.calculate_calibration_curve()
+#    reventador_sequence.calibrate_AA()
+#    reventador_sequence.convert_molecules_to_mass()
+#    i_iter += 1
 
 
 

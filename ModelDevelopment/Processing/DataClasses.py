@@ -3,11 +3,15 @@ import pandas as pd
 from BackgroundMethods import *
 import cv2
 from datetime import datetime, timedelta
+import QualityModelFunctions
+import math
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
 import os
 from scipy.stats import pearsonr
+import torch
+from torch.utils.data import DataLoader
 
 def show(image, cmap="gray"):
     plt.imshow(image, cmap=cmap)
@@ -104,7 +108,8 @@ class Sequence():
         '''Read all sample names from the given directory. Produce a list
         of band A samples, matched to corresponding bandB samples.
         If correct is True, match names of files for dark and vignette correction,
-        then initialse the registration transform, using the data from the volcano dictionary.'''
+        then initialse the registration transform, using the data from the volcano dictionary.
+        '''
         self.image_directory = directory_path
         if self.volc_dict == None and correct == True:
             print("ERROR: Volcano dictionary needed for data correction.")
@@ -201,7 +206,6 @@ class Sequence():
             self.clear_path_A = self.volc_dict["clear_sky_path_A"]
             self.clear_path_B = self.volc_dict["clear_sky_path_B"]
 
-
             #Registration transform:
             self.reg_trans_matrix = cv2.getPerspectiveTransform(self.volc_dict['registration_points_B'], self.volc_dict['registration_points_A'])
 
@@ -219,8 +223,181 @@ class Sequence():
 
 
         else:
-            print("NOTE: No corrections are being applied to this image sequence.")
+            print("NOTE: No correction data is being loaded for this image sequence.")
 
+    def match_timestep_images(self, requested_timesteps = [10, -10, 60, -60]):
+        '''For each pair of images that has been matched by the read-in function,
+        identify the indexes of the pairs which represent the requested timesteps
+        from that sample, and store as a list.'''
+        self.timestep_indicies = []
+        self.all_timestep_data_available = []
+        self.requested_timesteps = requested_timesteps
+
+        #For every image pair, identify which pair index corresponds to the +-10s and +-1min timesteps
+        for pair_time in self.times:
+            this_pair_timestep_indices = []
+            # Calculate the difference between this time and all available times
+            for ts in requested_timesteps:
+                target_time = pair_time + timedelta(seconds=ts)
+                diffs_from_target = [np.abs(t - target_time) for t in self.times]
+                minimum_diff_index = diffs_from_target.index(min(diffs_from_target))
+                min_diff = diffs_from_target[minimum_diff_index].seconds
+                diff_to_ts = pair_time - self.times[minimum_diff_index]
+
+                if min_diff <= 10 and diff_to_ts.seconds != 0: #If the timestep is within 10s of the one requested, and is not zero (relevant for the 10s step)
+                    this_pair_timestep_indices.append(minimum_diff_index)
+                else:
+                    this_pair_timestep_indices.append(np.nan)
+            self.timestep_indicies.append(this_pair_timestep_indices)
+            if np.nan in this_pair_timestep_indices:
+                self.all_timestep_data_available.append(False)
+            else:
+                self.all_timestep_data_available.append(True)
+    def read_and_correct_selected_indexes(self, correct=True, overwrite=True, temporal=True):
+        '''For each index in self.chunk_indicies, read and optionally correct the
+        corresponding image pair. If overwrite=True, the existing image list is overwritten.'''
+        img_shape = (486, 648)
+
+        if overwrite == True:
+            self.chunk_bandA = []
+            self.chunk_bandB = []
+
+            if temporal == True:
+            # Create an array to store the temporal image samples
+                #[chunk size, timestep, band]
+                self.chunk_temporal = np.empty(shape=(len(self.chunk_indexes), len(self.requested_timesteps), 2, img_shape[0], img_shape[1]))
+            else:
+                self.requested_timesteps = []
+
+        if correct == True:
+            # Calculate the vignette masks
+            print("Creating vignette masks.")
+            clear_img_A = cv2.imread(self.clear_path_A, -1).astype(np.float32)
+            self.vin_mask_A = np.divide(clear_img_A, np.max(clear_img_A))
+            clear_img_B = cv2.imread(self.clear_path_B, -1).astype(np.float32)
+            self.vin_mask_B = np.divide(clear_img_B, np.max(clear_img_B))
+
+        index_in_chunk = -1
+        for index_to_read in self.chunk_indexes:
+            index_in_chunk += 1
+            for timestep_to_read in [0] + self.requested_timesteps:
+                if timestep_to_read == 0:
+                    name_A = self.bandA_names[index_to_read]
+                    name_B = self.bandB_names[index_to_read]
+                else:
+                    timestep_index = self.requested_timesteps.index(timestep_to_read)
+                    matched_timestep_index = self.timestep_indicies[index_to_read][timestep_index]
+                    if math.isnan(matched_timestep_index):
+                        name_A = None
+                        name_B = None
+                    else:
+                        name_A = self.bandA_names[matched_timestep_index]
+                        name_B = self.bandB_names[matched_timestep_index]
+
+                #If the matching timestep exists
+                if name_A is None:
+                    bandA = np.empty(shape=img_shape)
+                    bandA[:] = np.nan
+                    bandB = np.empty(shape=img_shape)
+                    bandB[:] = np.nan
+                else:
+
+                    bandA = cv2.imread(self.image_directory + "/" + name_A, -1)
+                    bandB = cv2.imread(self.image_directory + "/" + name_B, -1)
+
+                    if correct == True:
+                        bandA, bandB = correct_sample(
+                            bandA=bandA,
+                            bandB=bandB,
+                            dark_name_A=self.dark_path_A + "/" + self.matched_dark_names_A[index_to_read],
+                            dark_name_B=self.dark_path_B + "/" + self.matched_dark_names_B[index_to_read],
+                            vin_mask_A=self.vin_mask_A,
+                            vin_mask_B=self.vin_mask_B,
+                            reg_trans=self.reg_trans_matrix,
+                            smm_A=self.smm_A,
+                            smm_B=self.smm_B)
+
+                if timestep_to_read == 0:
+                    self.chunk_bandA.append(bandA)
+                    self.chunk_bandB.append(bandB)
+                else:
+                    #Append to an array representing the temporal data
+                    self.chunk_temporal[index_in_chunk, timestep_index, 0, :, :] = bandA
+                    self.chunk_temporal[index_in_chunk, timestep_index, 1, :, :] = bandB
+
+    def apply_quality_models(self, chunk_size=50):
+        '''
+        Reading and correcting chunk_size samples at a time, apply the quality classification
+        models.
+        For each image pair, identify the corresponding pairs as close as possible to the
+        timestep required by the models. If no temporal data is available skip applying the
+        models to this image pair, and store the prediction as np.nan.
+        '''
+
+
+        # For each image pair, work out which index in the sequence corresponds to the required timesteps.
+        self.match_timestep_images()
+
+        # Make use of GPU if available:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        #device = "cpu"
+        print("Using device:" + device)
+        torch.cuda.empty_cache()
+
+        # Load the model definitions and trained weights
+        precip_model = QualityModelFunctions.get_triple_branched_resnet18(device)
+        cloud_model = QualityModelFunctions.get_triple_branched_resnet18(device)
+        print("Loading trained model weights:")
+        precip_model.load_state_dict(torch.load("C:/Users/ggp24ash/PycharmProjects/QualityIndexModels/SavedModelWeights/PrecipitationModel_V2.pth", weights_only=True))
+        cloud_model.load_state_dict(torch.load("C:/Users/ggp24ash/PycharmProjects/QualityIndexModels/SavedModelWeights/ObsCloudModel.pth", weights_only=True))
+        precip_model.eval()
+        cloud_model.eval()
+
+        # Load data in subsets of size "chunk_size", reducing the memory required
+        n_chunks = math.ceil(len(self.bandA_names) / chunk_size)
+        for chunk in range(1, n_chunks + 1):
+            start_index = (chunk - 1) * chunk_size
+            if chunk == n_chunks:
+                end_index = len(self.bandA_names) - 1
+            else:
+                end_index = (chunk * chunk_size) - 1
+            print("Applying models to image pairs indexed: " + str(start_index) + " to " + str(end_index))
+            self.chunk_indexes = np.arange(start_index, end_index + 1).astype(np.uint16)
+
+            # Read and correct this chunk of data
+            self.read_and_correct_selected_indexes(correct=True, overwrite=True, temporal=True)
+            # Load it as a pytorch tensor
+            eval_set = QualityModelFunctions.ImageLoader(device=device, indexes=self.chunk_indexes, bandA_list=self.chunk_bandA, bandB_list=self.chunk_bandB, temporal_available=self.all_timestep_data_available, temporal_array=self.chunk_temporal, timesteps_provided=self.requested_timesteps)
+            # Set up DataLoader to iterate over samples
+            dataloader = DataLoader(eval_set, batch_size=1, shuffle=False, drop_last=False)
+
+            # Iterating over each observation in the chunk
+            for index, obs in enumerate(iter(dataloader)):
+                x_p, x_c, apply_models, image_index = obs
+                if apply_models == True: #If the necessary temporal data was sucessfully matched
+                    # Normalise the samples with ImageNet mean and standard deviation
+                    x_p_norm = QualityModelFunctions.scale_and_norm_batch(x_p, device)
+                    # Predict using the model, and move the output from the GPU if applicable
+                    prediction_p = precip_model(x_p_norm).cpu().detach().numpy()[0,:]
+                    if chunk == 1 and index == 0:
+                        self.all_precip_predictions = prediction_p
+                    else:
+                        self.all_precip_predictions = np.concatenate((self.all_precip_predictions, prediction_p))
+
+                    # Repeat this process, predicting using the cloud model
+                    x_c_norm = QualityModelFunctions.scale_and_norm_batch(x_c, device)
+                    prediction_c = cloud_model(x_c_norm).cpu().detach().numpy()[0,:]
+                    if chunk == 1 and index == 0:
+                        self.all_cloud_predictions = prediction_c
+                    else:
+                        self.all_cloud_predictions = np.concatenate((self.all_cloud_predictions, prediction_c))
+                else:
+                    if chunk == 1 and index == 0:
+                        self.all_precip_predictions = np.array([np.nan])
+                        self.all_cloud_predictions = np.array([np.nan])
+                    else:
+                        self.all_precip_predictions = np.concatenate((self.all_precip_predictions, np.array([np.nan])))
+                        self.all_cloud_predictions = np.concatenate((self.all_cloud_predictions, np.array([np.nan])))
 
     def iterate(self, b, chunk_size_m=30):
         '''Return the first 30mins (or specified time period) of the sequence, then
@@ -462,6 +639,13 @@ class Sequence():
         multiplier = 64.06/(6.02*10e22)
         self.CD = self.CD * multiplier
         show(self.CD[-1,:,:], cmap="YlGnBu_r")
+
+    def calculate_pixel_geometry(self, geom_data):
+        '''Input camera coordinates, real-world and camera coordinates of a feature in the image.
+        We want to calculate for each pixel the real world coordinates of its corners.'''
+
+        #
+
 
 
 

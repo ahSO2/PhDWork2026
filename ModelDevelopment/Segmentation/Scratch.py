@@ -1,10 +1,8 @@
 import numpy as np
+import math
 
-test = np.zeros(shape=(4, 4, 3))
-test[2,2,:] = 1
-test[2,2,2] = 3
+a = np.nan
+b = float('nan')
 
-#print(test)
-
-points = np.reshape(test, (4 * 4, 3))
-print(points)
+print(math.isnan(a))
+print(math.isnan(b))
