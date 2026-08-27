@@ -1,5 +1,4 @@
-import pandas as pd
-
+import bisect
 from BackgroundMethods import *
 import cv2
 from datetime import datetime, timedelta
@@ -9,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
 import os
+import pandas as pd
 from scipy.stats import pearsonr
 import torch
 from torch.utils.data import DataLoader
@@ -92,7 +92,7 @@ class Sequence():
     '''Class representing a sequence of data to be processed.'''
     def __init__(self):
         self.volc_dict = None
-        self.previous_indicies = []
+        self.previous_indexes = []
         self.batch_bandA = []
         self.batch_bandB = []
         self.spectra_exists = []
@@ -104,7 +104,7 @@ class Sequence():
     def set_volcano_dictionary(self, dictionary):
         self.volc_dict = dictionary
 
-    def read_and_match(self, directory_path, correct=True):
+    def read_and_match_full_sequence(self, directory_path, correct=True):
         '''Read all sample names from the given directory. Produce a list
         of band A samples, matched to corresponding bandB samples.
         If correct is True, match names of files for dark and vignette correction,
@@ -253,21 +253,21 @@ class Sequence():
                 self.all_timestep_data_available.append(False)
             else:
                 self.all_timestep_data_available.append(True)
-    def read_and_correct_selected_indexes(self, correct=True, overwrite=True, temporal=True):
+    def read_and_correct_selected_indexes(self, indexes_to_read, correct=True, temporal=True):
         '''For each index in self.chunk_indicies, read and optionally correct the
-        corresponding image pair. If overwrite=True, the existing image list is overwritten.'''
+        corresponding image pair (the existing image list is overwritten). Alternatively
+        a list of ''' #TODO edit this function to calculate and return the lists, rather than overwriting the sequence attributes
+        #TODO so that it is a more versatile function
         img_shape = (486, 648)
+        bandA_outputs = []
+        bandB_outputs = []
 
-        if overwrite == True:
-            self.chunk_bandA = []
-            self.chunk_bandB = []
-
-            if temporal == True:
+        if temporal == True:
             # Create an array to store the temporal image samples
-                #[chunk size, timestep, band]
-                self.chunk_temporal = np.empty(shape=(len(self.chunk_indexes), len(self.requested_timesteps), 2, img_shape[0], img_shape[1]))
-            else:
-                self.requested_timesteps = []
+            #[chunk size, timestep, band]
+            temporal_array = np.empty(shape=(len(self.chunk_indexes), len(self.requested_timesteps), 2, img_shape[0], img_shape[1]))
+        else:
+            self.requested_timesteps = []
 
         if correct == True:
             # Calculate the vignette masks
@@ -317,13 +317,19 @@ class Sequence():
                             smm_A=self.smm_A,
                             smm_B=self.smm_B)
 
+
+
                 if timestep_to_read == 0:
-                    self.chunk_bandA.append(bandA)
-                    self.chunk_bandB.append(bandB)
+                    bandA_outputs.append(bandA)
+                    bandB_outputs.append(bandB)
                 else:
-                    #Append to an array representing the temporal data
-                    self.chunk_temporal[index_in_chunk, timestep_index, 0, :, :] = bandA
-                    self.chunk_temporal[index_in_chunk, timestep_index, 1, :, :] = bandB
+                    #Append to the array representing the temporal data
+                    temporal_array[index_in_chunk, timestep_index, 0, :, :] = bandA
+                    temporal_array[index_in_chunk, timestep_index, 1, :, :] = bandB
+        return bandA_outputs, bandB_outputs, temporal_array
+
+
+
 
     def apply_quality_models(self, chunk_size=50):
         '''
@@ -333,7 +339,6 @@ class Sequence():
         timestep required by the models. If no temporal data is available skip applying the
         models to this image pair, and store the prediction as np.nan.
         '''
-
 
         # For each image pair, work out which index in the sequence corresponds to the required timesteps.
         self.match_timestep_images()
@@ -365,7 +370,7 @@ class Sequence():
             self.chunk_indexes = np.arange(start_index, end_index + 1).astype(np.uint16)
 
             # Read and correct this chunk of data
-            self.read_and_correct_selected_indexes(correct=True, overwrite=True, temporal=True)
+            self.batch_bandA, self.batch_bandB, self.chunk_temporal = self.read_and_correct_selected_indexes(indexes_to_read=self.chunk_indexes, correct=True, overwrite=True, temporal=True)
             # Load it as a pytorch tensor
             eval_set = QualityModelFunctions.ImageLoader(device=device, indexes=self.chunk_indexes, bandA_list=self.chunk_bandA, bandB_list=self.chunk_bandB, temporal_available=self.all_timestep_data_available, temporal_array=self.chunk_temporal, timesteps_provided=self.requested_timesteps)
             # Set up DataLoader to iterate over samples
@@ -399,7 +404,65 @@ class Sequence():
                         self.all_precip_predictions = np.concatenate((self.all_precip_predictions, np.array([np.nan])))
                         self.all_cloud_predictions = np.concatenate((self.all_cloud_predictions, np.array([np.nan])))
 
-    def iterate(self, b, chunk_size_m=30):
+    def iterate(self, b, method="basic", mins=5, correct=True, load_temporal=True):
+        '''Read the batch of data necessary for processing of image at index b.
+        Typically, this would be the X mins of data surrounding the current image,
+        (or the first or last X mins for applicable samples).'''
+
+        #Determine which image indexes we want to load
+        current_time = self.times[b]
+        #If we are in the first X/2 mins of the sequence
+        if (current_time - self.times[0]).seconds < (mins * 60):
+            #Select the frist X mins of data
+            self.chunk_end_time = self.times[0] + timedelta(minutes=mins)
+            # Now select indicies of the "times" list which are in [start, end]
+            self.chunk_indexes = [i for i in range(len(self.times)) if self.times[i] <= self.chunk_end_time]
+        elif (self.times[-1] - current_time).seconds < (mins * 60): #We are in the last X/2 mins of the sequence
+            self.chunk_start_time = self.times[-1] - timedelta(minutes=mins)
+            self.chunk_indexes = [i for i in range(len(self.times)) if self.times[i] >= self.chunk_start_time]
+        else: #Take the X mins surrounding the current image:
+            self.chunk_start_time =  current_time - timedelta(mins=mins/2)
+            self.chunk_end_time = current_time + timedelta(mins=mins/2)
+            self.chunk_indexes = [i for i in range(len(self.times)) if ((self.times[i] >= self.chunk_start_time) and (self.times[i] <= self.chunk_end_time))]
+
+        #Determine overlap with previous batch
+        overlap = set(self.chunk_indexes).intersection(set(self.previous_indexes))
+        overlap_indexes_in_chunk = [self.chunk_indexes.index(i) for i in overlap]
+
+        #Select overlapping images from previous batch (including temporal if applic)
+        self.batch_bandA = [self.batch_bandA[i] for i in overlap_indexes_in_chunk]
+        self.batch_bandB = [self.batch_bandB[i] for i in overlap_indexes_in_chunk]
+        try:
+            self.chunk_temporal
+        except:
+            pass
+        else:
+            self.chunk_temporal = self.chunk_temporal[overlap_indexes_in_chunk,:,:,:,:]
+
+        self.intermed_chunk_indicies = list(overlap) #Keep track of what indexes we currently have data stored for
+        # Load any new images that are needed
+        new_indexes = set(self.chunk_indexes).difference(set(self.previous_indexes))
+        # For each new index, read the image and slot it into the correct position in
+        # the bandA, bandB and temporal data structures, based on the image index.
+        new_bandA, new_bandB, new_temporal = self.read_and_correct_selected_indexes(indexes_to_read=new_indexes, correct=correct, temporal=load_temporal)
+        new_items_added = 0
+        for ni in new_indexes:
+            #Place the data
+            temp_array_to_place = new_temporal[new_items_added, :, :, :, :]
+            if ni > self.intermed_chunk_indicies[-1]: #If the new image is later in the sequence
+                self.batch_bandA.append(new_bandA[new_items_added])
+                self.batch_bandB.append(new_bandB[new_items_added])
+                self.chunk_temporal = np.concatenate((self.chunk_temporal, temp_array_to_place), axis=0)
+                self.intermed_chunk_indicies.append(ni)
+            else:
+                location = bisect.bisect_left(self.intermed_chunk_indicies, ni) #index at which to insert the new data
+                self.batch_bandA.insert(location, new_bandA[new_items_added])
+                self.batch_bandB.insert(location, new_bandB[new_items_added])
+                self.chunk_temporal = np.insert(self.chunk_temporal, location, temp_array_to_place, axis=0)
+                self.intermed_chunk_indicies.insert(location, ni)
+            new_items_added += 1
+
+    def iterate_real_time_OLDVERSION(self, b, chunk_size_m=30):
         '''Return the first 30mins (or specified time period) of the sequence, then
         incrementally return a batch containing the next image and all samples within
         the previous 30mins.
@@ -484,6 +547,8 @@ class Sequence():
                                                                                                         smm_B=self.smm_B)
         remaining_iterations = len(self.bandA_names) - 1 - self.chunk_indicies[-1]
         return self.batch_bandA, self.batch_bandB, remaining_iterations
+
+    ###################### Image Calculator Functions #############################
     def estimate_backgrounds(self, method, b):
         '''For the current batch of data which has been read by calling the
         "iterate" method and is stored as self.batch_bandA/B, calculate the
@@ -535,7 +600,7 @@ class Sequence():
         '''Calibrate the absorbance images such that the median in a specific region
         e.g. the flank is zero, using simple subtraction.'''
         pass
-
+    ################################################################################
     def read_spectrometer_data(self, path):
         '''Read the time series of spectrometer measurements from the specified
         file path, and match to the timestamps of the images in this sequence.'''

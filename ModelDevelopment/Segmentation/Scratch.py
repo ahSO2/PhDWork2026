@@ -1,8 +1,7 @@
 import numpy as np
 import math
+import bisect
 
-a = np.nan
-b = float('nan')
+list = [1, 2, 3, 4]
 
-print(math.isnan(a))
-print(math.isnan(b))
+print(bisect.bisect_left(list, 5))

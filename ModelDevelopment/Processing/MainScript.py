@@ -28,24 +28,23 @@ geom_data = {'cfov_azim':50, #Azimuth angle of CFOV of camera #TODO Dummy values
 #X minutes at a time.
 reventador_sequence = Sequence()
 reventador_sequence.set_volcano_dictionary(Reventador_2022_dictionary)
-reventador_sequence.read_and_match("E:/Reventador/2022/2022-04-24/Seq_2")
+reventador_sequence.read_and_match_full_sequence("E:/Reventador/2022/2022-04-24/Seq_2")
 reventador_sequence.read_spectrometer_data("E:/Reventador/2022/2022-04-24/Seq_2/Processed_spec_2026-08-19T160055/doas_results_2022-04-24T170000.csv")
 #Apply quality models for the whole sequence, and save the predictions to two arrays.
 #This is run by loading batches of images at a time, to avoid overwhelming the memory.
-reventador_sequence.apply_quality_models(chunk_size=50)
+#reventador_sequence.apply_quality_models(chunk_size=20)
+#print(reventador_sequence.all_precip_predictions)
+#print(reventador_sequence.all_cloud_predictions)
 
 #Next, iterate over each image, selecting the set of images to load (based on which data is to be used to calibrate that sample)
-mins = 5
-i_iter = 0 #Batch index
-rem=1
+
 #TODO iterate over each image, determining the data to load based on
 #TODO the surrounding samples needed for the calibration for that image
-#while rem > 0: #While the remaining number of batch iterations is greater than zero
-#    batchBandA, batchBandB, rem = reventador_sequence.iterate(b=i_iter, chunk_size_m=mins)
-#    print(i_iter)
-#    print(reventador_sequence.batch_start_time)
-#    print(reventador_sequence.batch_end_time)
-#    print(reventador_sequence.chunk_indicies)
+for i in range(0, len(reventador_sequence.bandA_names)):
+    batchBandA, batchBandB = reventador_sequence.iterate(b=i, method="basic")
+
+#TODO Update the backgrounds, and calculate the absorbance for the new chunk (copying over any that were already calculated in the previous)
+
 #    reventador_sequence.estimate_backgrounds(method=constant_ratio_assumption, b=i_iter)
 #    reventador_sequence.calculate_absorbance(b=i_iter)
 #    reventador_sequence.find_spectrometer_FOV(s=10, plot=True)
