@@ -2,6 +2,7 @@ import numpy as np
 import math
 import bisect
 
-list = [1, 2, 3, 4]
+list = [1, 3, 2, 4]
 
-print(bisect.bisect_left(list, 5))
+list.sort()
+print(list)

@@ -92,6 +92,7 @@ class Sequence():
     '''Class representing a sequence of data to be processed.'''
     def __init__(self):
         self.volc_dict = None
+        self.chunk_indexes = []
         self.previous_indexes = []
         self.batch_bandA = []
         self.batch_bandB = []
@@ -101,10 +102,11 @@ class Sequence():
         self.bgs_B = []
 
 
+
     def set_volcano_dictionary(self, dictionary):
         self.volc_dict = dictionary
 
-    def read_and_match_full_sequence(self, directory_path, correct=True):
+    def initialise_and_match_full_sequence(self, directory_path, correct=True):
         '''Read all sample names from the given directory. Produce a list
         of band A samples, matched to corresponding bandB samples.
         If correct is True, match names of files for dark and vignette correction,
@@ -205,9 +207,15 @@ class Sequence():
             #Assuming that clears are already dark subtracted
             self.clear_path_A = self.volc_dict["clear_sky_path_A"]
             self.clear_path_B = self.volc_dict["clear_sky_path_B"]
+            self.create_vinette_masks()
 
             #Registration transform:
             self.reg_trans_matrix = cv2.getPerspectiveTransform(self.volc_dict['registration_points_B'], self.volc_dict['registration_points_A'])
+
+            try:
+                self.flank_mask = cv2.imread(self.volc_dict["flank_mask_path"], -1)
+            except:
+                print("ERROR in reading flank mask.")
 
             #Masks for permanent marks on sensor to be infilled
             self.sensor_mark_mask_path_A = self.volc_dict["sensor_marks_mask_A"]
@@ -225,19 +233,18 @@ class Sequence():
         else:
             print("NOTE: No correction data is being loaded for this image sequence.")
 
-    def match_timestep_images(self, requested_timesteps = [10, -10, 60, -60]):
+    def match_timestep_images(self):
         '''For each pair of images that has been matched by the read-in function,
         identify the indexes of the pairs which represent the requested timesteps
         from that sample, and store as a list.'''
         self.timestep_indicies = []
         self.all_timestep_data_available = []
-        self.requested_timesteps = requested_timesteps
 
         #For every image pair, identify which pair index corresponds to the +-10s and +-1min timesteps
         for pair_time in self.times:
             this_pair_timestep_indices = []
             # Calculate the difference between this time and all available times
-            for ts in requested_timesteps:
+            for ts in self.requested_timesteps:
                 target_time = pair_time + timedelta(seconds=ts)
                 diffs_from_target = [np.abs(t - target_time) for t in self.times]
                 minimum_diff_index = diffs_from_target.index(min(diffs_from_target))
@@ -253,32 +260,30 @@ class Sequence():
                 self.all_timestep_data_available.append(False)
             else:
                 self.all_timestep_data_available.append(True)
+    def create_vinette_masks(self):
+        # Calculate the vignette masks
+        print("Creating vignette masks.")
+        clear_img_A = cv2.imread(self.clear_path_A, -1).astype(np.float32)
+        self.vin_mask_A = np.divide(clear_img_A, np.max(clear_img_A))
+        clear_img_B = cv2.imread(self.clear_path_B, -1).astype(np.float32)
+        self.vin_mask_B = np.divide(clear_img_B, np.max(clear_img_B))
     def read_and_correct_selected_indexes(self, indexes_to_read, correct=True, temporal=True):
         '''For each index in self.chunk_indicies, read and optionally correct the
         corresponding image pair (the existing image list is overwritten). Alternatively
-        a list of ''' #TODO edit this function to calculate and return the lists, rather than overwriting the sequence attributes
-        #TODO so that it is a more versatile function
-        img_shape = (486, 648)
+        a list of '''
+
         bandA_outputs = []
         bandB_outputs = []
 
         if temporal == True:
             # Create an array to store the temporal image samples
             #[chunk size, timestep, band]
-            temporal_array = np.empty(shape=(len(self.chunk_indexes), len(self.requested_timesteps), 2, img_shape[0], img_shape[1]))
+            temporal_array = np.empty(shape=(len(indexes_to_read), len(self.requested_timesteps), 2, self.img_shape[0], self.img_shape[1]))
         else:
             self.requested_timesteps = []
 
-        if correct == True:
-            # Calculate the vignette masks
-            print("Creating vignette masks.")
-            clear_img_A = cv2.imread(self.clear_path_A, -1).astype(np.float32)
-            self.vin_mask_A = np.divide(clear_img_A, np.max(clear_img_A))
-            clear_img_B = cv2.imread(self.clear_path_B, -1).astype(np.float32)
-            self.vin_mask_B = np.divide(clear_img_B, np.max(clear_img_B))
-
         index_in_chunk = -1
-        for index_to_read in self.chunk_indexes:
+        for index_to_read in indexes_to_read:
             index_in_chunk += 1
             for timestep_to_read in [0] + self.requested_timesteps:
                 if timestep_to_read == 0:
@@ -296,9 +301,9 @@ class Sequence():
 
                 #If the matching timestep exists
                 if name_A is None:
-                    bandA = np.empty(shape=img_shape)
+                    bandA = np.empty(shape=self.img_shape)
                     bandA[:] = np.nan
-                    bandB = np.empty(shape=img_shape)
+                    bandB = np.empty(shape=self.img_shape)
                     bandB[:] = np.nan
                 else:
 
@@ -316,7 +321,6 @@ class Sequence():
                             reg_trans=self.reg_trans_matrix,
                             smm_A=self.smm_A,
                             smm_B=self.smm_B)
-
 
 
                 if timestep_to_read == 0:
@@ -339,9 +343,6 @@ class Sequence():
         timestep required by the models. If no temporal data is available skip applying the
         models to this image pair, and store the prediction as np.nan.
         '''
-
-        # For each image pair, work out which index in the sequence corresponds to the required timesteps.
-        self.match_timestep_images()
 
         # Make use of GPU if available:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -410,58 +411,103 @@ class Sequence():
         (or the first or last X mins for applicable samples).'''
 
         #Determine which image indexes we want to load
+        print("Current time:")
         current_time = self.times[b]
+        print(current_time)
+        self.previous_indexes = self.chunk_indexes
+
         #If we are in the first X/2 mins of the sequence
-        if (current_time - self.times[0]).seconds < (mins * 60):
+        if (current_time - self.times[0]).seconds < (mins/2 * 60):
             #Select the frist X mins of data
             self.chunk_end_time = self.times[0] + timedelta(minutes=mins)
             # Now select indicies of the "times" list which are in [start, end]
             self.chunk_indexes = [i for i in range(len(self.times)) if self.times[i] <= self.chunk_end_time]
-        elif (self.times[-1] - current_time).seconds < (mins * 60): #We are in the last X/2 mins of the sequence
+        elif (self.times[-1] - current_time).seconds < (mins/2 * 60): #We are in the last X/2 mins of the sequence
             self.chunk_start_time = self.times[-1] - timedelta(minutes=mins)
             self.chunk_indexes = [i for i in range(len(self.times)) if self.times[i] >= self.chunk_start_time]
         else: #Take the X mins surrounding the current image:
-            self.chunk_start_time =  current_time - timedelta(mins=mins/2)
-            self.chunk_end_time = current_time + timedelta(mins=mins/2)
+            self.chunk_start_time =  current_time - timedelta(minutes=mins/2)
+            self.chunk_end_time = current_time + timedelta(minutes=mins/2)
             self.chunk_indexes = [i for i in range(len(self.times)) if ((self.times[i] >= self.chunk_start_time) and (self.times[i] <= self.chunk_end_time))]
 
+        chunk_times = [self.times[i] for i in self.chunk_indexes]
+        print(chunk_times)
+
         #Determine overlap with previous batch
-        overlap = set(self.chunk_indexes).intersection(set(self.previous_indexes))
-        overlap_indexes_in_chunk = [self.chunk_indexes.index(i) for i in overlap]
+        self.overlap = list(set(self.chunk_indexes).intersection(set(self.previous_indexes)))
+        self.overlap.sort()
+        self.overlap_indexes_in_chunk = [self.previous_indexes.index(i) for i in self.overlap]
+        print("Overlap with previous batch:")
+        print(self.overlap)
 
         #Select overlapping images from previous batch (including temporal if applic)
-        self.batch_bandA = [self.batch_bandA[i] for i in overlap_indexes_in_chunk]
-        self.batch_bandB = [self.batch_bandB[i] for i in overlap_indexes_in_chunk]
+        self.batch_bandA = [self.batch_bandA[i] for i in self.overlap_indexes_in_chunk]
+        self.batch_bandB = [self.batch_bandB[i] for i in self.overlap_indexes_in_chunk]
         try:
             self.chunk_temporal
         except:
             pass
         else:
-            self.chunk_temporal = self.chunk_temporal[overlap_indexes_in_chunk,:,:,:,:]
+            self.chunk_temporal = self.chunk_temporal[self.overlap_indexes_in_chunk,:,:,:,:]
 
-        self.intermed_chunk_indicies = list(overlap) #Keep track of what indexes we currently have data stored for
+
+        self.intermed_chunk_indicies = self.overlap.copy() #Keep track of what indexes we currently have data stored for
         # Load any new images that are needed
-        new_indexes = set(self.chunk_indexes).difference(set(self.previous_indexes))
+        print("New pairs to read:")
+        self.new_indexes = list(set(self.chunk_indexes).difference(set(self.previous_indexes)))
+        self.new_indexes.sort()
+        print([self.times[i] for i in self.new_indexes])
         # For each new index, read the image and slot it into the correct position in
         # the bandA, bandB and temporal data structures, based on the image index.
-        new_bandA, new_bandB, new_temporal = self.read_and_correct_selected_indexes(indexes_to_read=new_indexes, correct=correct, temporal=load_temporal)
-        new_items_added = 0
-        for ni in new_indexes:
-            #Place the data
-            temp_array_to_place = new_temporal[new_items_added, :, :, :, :]
-            if ni > self.intermed_chunk_indicies[-1]: #If the new image is later in the sequence
-                self.batch_bandA.append(new_bandA[new_items_added])
-                self.batch_bandB.append(new_bandB[new_items_added])
-                self.chunk_temporal = np.concatenate((self.chunk_temporal, temp_array_to_place), axis=0)
-                self.intermed_chunk_indicies.append(ni)
-            else:
-                location = bisect.bisect_left(self.intermed_chunk_indicies, ni) #index at which to insert the new data
-                self.batch_bandA.insert(location, new_bandA[new_items_added])
-                self.batch_bandB.insert(location, new_bandB[new_items_added])
-                self.chunk_temporal = np.insert(self.chunk_temporal, location, temp_array_to_place, axis=0)
-                self.intermed_chunk_indicies.insert(location, ni)
-            new_items_added += 1
+        print("Loading new pairs:")
+        if len(self.new_indexes) != 0:
+            new_bandA, new_bandB, new_temporal = self.read_and_correct_selected_indexes(indexes_to_read=self.new_indexes, correct=correct, temporal=load_temporal)
 
+        print("Saving new pairs:")
+        if len(self.intermed_chunk_indicies) == 0: #If the batch is empty, then just take the newly calculated image lists
+            self.batch_bandA = new_bandA
+            self.batch_bandB = new_bandB
+            self.chunk_temporal = new_temporal
+            self.intermed_chunk_indicies = list(self.new_indexes)
+        else: #Otherwise we need to place each sample at the correct index:
+            new_items_added = 0
+            for ni in self.new_indexes:
+                #Place the data
+                #[img_pair_index, timestep, channel, h, w]
+                temp_array_to_place = np.empty(shape=(1, len(self.requested_timesteps), 2, self.img_shape[0], self.img_shape[1]))
+                temp_array_to_place[ 0, :, :, :, :] = new_temporal[new_items_added, :, :, :, :]
+                if ni > self.intermed_chunk_indicies[-1]: #If the new image is later in the sequence
+                    self.batch_bandA.append(new_bandA[new_items_added])
+                    self.batch_bandB.append(new_bandB[new_items_added])
+                    self.chunk_temporal = np.concatenate((self.chunk_temporal, temp_array_to_place), axis=0)
+                    self.intermed_chunk_indicies.append(ni)
+                else:
+                    location = bisect.bisect_left(self.intermed_chunk_indicies, ni) #index at which to insert the new data
+                    self.batch_bandA.insert(location, new_bandA[new_items_added])
+                    self.batch_bandB.insert(location, new_bandB[new_items_added])
+                    self.chunk_temporal = np.insert(self.chunk_temporal, location, temp_array_to_place, axis=0)
+                    self.intermed_chunk_indicies.insert(location, ni)
+                new_items_added += 1
+
+    def view_current_chunk(self, band="A", timesteps=[-10, 10]):
+        for index in range(0, len(self.chunk_indexes)):
+            if band == "A":
+                band = 0
+                t0_imgs = self.batch_bandA
+                names = self.bandA_names
+            elif band == "B":
+                band = 1
+                t0_imgs = self.batch_bandB
+                names = self.bandB_names
+
+            tsi_1 = self.requested_timesteps.index(timesteps[0])
+            tsi_2 = self.requested_timesteps.index(timesteps[1])
+            fig, axs = plt.subplots(ncols=3)
+            axs[0].imshow(self.chunk_temporal[index,tsi_1,band,:,:], cmap="gray")
+            axs[1].imshow(t0_imgs[index], cmap="gray")
+            axs[2].imshow(self.chunk_temporal[index, tsi_2,band,:,:], cmap="gray")
+            axs[1].set_title(names[self.chunk_indexes[index]])
+            plt.show()
     def iterate_real_time_OLDVERSION(self, b, chunk_size_m=30):
         '''Return the first 30mins (or specified time period) of the sequence, then
         incrementally return a batch containing the next image and all samples within
@@ -549,50 +595,90 @@ class Sequence():
         return self.batch_bandA, self.batch_bandB, remaining_iterations
 
     ###################### Image Calculator Functions #############################
-    def estimate_backgrounds(self, method, b):
+    def estimate_backgrounds(self, method):
         '''For the current batch of data which has been read by calling the
         "iterate" method and is stored as self.batch_bandA/B, calculate the
         background estimations for every image, using the specified method.'''
-        if b == 0:
-            #Then need to estimate backgrounds for the whole first batch
-            for background_index in range(0, len(self.chunk_indicies)):
 
-                bgA, bgB = method(self.batch_bandA[background_index], self.batch_bandB[background_index], self.flank_mask)
-                self.bgs_A.append(bgA)
-                self.bgs_B.append(bgB)
+        #Select backgrounds from the previous chunk which overlap with the current chunk
+        self.bgs_A = [self.bgs_A[i] for i in self.overlap_indexes_in_chunk]
+        self.bgs_B = [self.bgs_B[i] for i in self.overlap_indexes_in_chunk]
+
+        #If there are new pairs in this chunk, calculate their backgrounds:
+        new_bgs_A = []
+        new_bgs_B = []
+        if len(self.new_indexes) != 0:
+            for new_index in self.new_indexes:
+                index_in_this_chunk = self.chunk_indexes.index(new_index)
+                bgA_new, bgB_new = method(self.batch_bandA[index_in_this_chunk], self.batch_bandB[index_in_this_chunk], self.flank_mask)
+                new_bgs_A.append(bgA_new)
+                new_bgs_B.append(bgB_new)
+
+        if len(self.bgs_A) == 0: #If this is an entirely distinct chunk from the previous, just save the lists calculated for the new indexes
+            self.bgs_A = new_bgs_A
+            self.bgs_B = new_bgs_B
 
         else:
-            #Calculate and append the background estimation for the new image
-            bgA_new, bgB_new = method(self.batch_bandA[-1], self.batch_bandB[-1], self.flank_mask)
-            self.bgs_A.append(bgA_new)
-            self.bgs_B.append(bgB_new)
+            self.indexes_of_stored_bgs = self.overlap.copy()
+            new_items_added = 0
+            for ni in self.new_indexes:
+                if ni > self.indexes_of_stored_bgs[-1]: #Add the new backgrounds to the end of the relevant lists
+                    self.bgs_A.append(new_bgs_A[new_items_added])
+                    self.bgs_B.append(new_bgs_B[new_items_added])
+                    self.indexes_of_stored_bgs.append(ni)
+                else: #Calculate where in the existing list of backgrounds to place the new ones
+                    location = bisect.bisect_left(self.indexes_of_stored_bgs, ni)  # index at which to insert the new data
+                    self.bgs_A.insert(location, new_bgs_A[new_items_added])
+                    self.bgs_B.insert(location, new_bgs_B[new_items_added])
+                    self.indexes_of_stored_bgs.insert(location, ni)
 
-            #Drop any extra background values from the start of the list
-            extra_count = len(self.bgs_A) - len(self.batch_bandA)
-            if extra_count > 0:
-                self.bgs_A = self.bgs_A[extra_count:]
-                self.bgs_B = self.bgs_B[extra_count:]
+                new_items_added += 1
 
-    def calculate_absorbance(self, b):
+    def calculate_absorbance(self):
         '''Calculate the absorbance for the current batch of data, assuming background images have been estimated.
         The result is stored as an array of shape [n_frames, height, width].'''
-        # If batch is zero, calculate for whole batch:
-        if b == 0:
-            self.AA = calculate_AA(self.batch_bandA, self.batch_bandB, self.bgs_A, self.bgs_B)
 
-        #If this is not he first batch, calculate just for the last image:
-        else:
-            # Calculate and append the absorbance for the new image
-            AA_new = calculate_AA(self.batch_bandA[-1], self.batch_bandB[-1], self.bgs_A[-1], self.bgs_B[-1])
-            new_template = np.ma.empty(shape=(1, AA_new.shape[0], AA_new.shape[1]))
-            new_template[:,:,:] = AA_new
-            new_template.mask = AA_new.mask
-            self.AA = np.ma.concatenate([self.AA, new_template], axis=0)
+        existing_AA = True
+        try:
+            # Select absorbance values from the previous chunk which overlap with the current chunk
+            self.AA = self.AA[self.overlap_indexes_in_chunk, :, :]
+            self.AA.mask = self.AA[self.overlap_indexes_in_chunk, :, :].mask #Copy over the mask too
+        except:
+            existing_AA = False
 
-            # Drop any extra absorbance values from the start of the list
-            extra_count = self.AA.shape[0] - len(self.batch_bandA)
-            if extra_count > 0:
-                self.AA = self.AA[extra_count:,:,:]
+        # If there are new pairs in this chunk, calculate their absorbance images:
+        if len(self.new_indexes) != 0:
+            new_AA_array = np.ma.empty(shape=(len(self.new_indexes), self.img_shape[0], self.img_shape[1]))
+            new_calculated = 0
+            for new_index in self.new_indexes:
+                index_in_this_chunk = self.chunk_indexes.index(new_index) #Find the position of the data for this index in this chunk
+                AA_img = calculate_AA(self.batch_bandA[index_in_this_chunk], self.batch_bandB[index_in_this_chunk], self.bgs_A[index_in_this_chunk], self.bgs_B[index_in_this_chunk])
+                new_AA_array[new_calculated, :, :] = AA_img
+                new_AA_array[new_calculated, :, :].mask = AA_img.mask
+                new_calculated += 1
+
+        if len(self.overlap) == 0: #If this is an entirely distinct chunk from the previous, just save the AA images calculated for the new indexes
+            self.AA = new_AA_array
+            self.AA.mask = new_AA_array.mask
+
+        else: #Place the new AA images in the correct position in the array
+            self.indexes_of_stored_AAs = self.overlap.copy()
+            new_items_added = 0
+            for ni in self.new_indexes:
+                #If the image needs to be joined to the end of the array
+                new_AA = np.ma.empty(shape=(1, self.img_shape[0], self.img_shape[1]))
+                new_AA[:,:,:] = new_AA_array[new_items_added, :, :]
+                new_AA.mask = new_AA_array[new_items_added, :, :].mask
+                if ni > self.indexes_of_stored_AAs[-1]:
+                    self.AA = np.ma.concatenate([self.AA, new_AA], axis=0)
+                    self.indexes_of_stored_AAs.append(ni)
+                else:
+                    location = bisect.bisect_left(self.indexes_of_stored_AAs, ni)  # index at which to insert the new data
+                    np.insert(self.AA, location, new_AA, axis=0)
+                    self.indexes_of_stored_AAs.insert(location, ni)
+
+                new_items_added += 1
+
 
 
     def translate_absorbance(self):
