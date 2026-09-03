@@ -1,7 +1,10 @@
+from mpl_toolkits.basemap import Basemap
 import bisect
 from BackgroundMethods import *
 import cv2
 from datetime import datetime, timedelta
+import geonum
+from geonum import BASEMAP_AVAILABLE
 import QualityModelFunctions
 import math
 import matplotlib.pyplot as plt
@@ -9,6 +12,7 @@ from matplotlib.patches import Ellipse
 import numpy as np
 import os
 import pandas as pd
+import random
 from scipy.stats import pearsonr
 import torch
 from torch.utils.data import DataLoader
@@ -269,8 +273,9 @@ class Sequence():
         self.vin_mask_B = np.divide(clear_img_B, np.max(clear_img_B))
     def read_and_correct_selected_indexes(self, indexes_to_read, correct=True, temporal=True):
         '''For each index in self.chunk_indicies, read and optionally correct the
-        corresponding image pair (the existing image list is overwritten). Alternatively
-        a list of '''
+        corresponding image pair (the existing image list is overwritten).
+
+        It is assumed that the clear sky images linked in the volcano dictionary are dark subtracted.'''
 
         bandA_outputs = []
         bandB_outputs = []
@@ -371,9 +376,9 @@ class Sequence():
             self.chunk_indexes = np.arange(start_index, end_index + 1).astype(np.uint16)
 
             # Read and correct this chunk of data
-            self.batch_bandA, self.batch_bandB, self.chunk_temporal = self.read_and_correct_selected_indexes(indexes_to_read=self.chunk_indexes, correct=True, overwrite=True, temporal=True)
+            self.batch_bandA, self.batch_bandB, self.chunk_temporal = self.read_and_correct_selected_indexes(indexes_to_read=self.chunk_indexes, correct=True, temporal=True)
             # Load it as a pytorch tensor
-            eval_set = QualityModelFunctions.ImageLoader(device=device, indexes=self.chunk_indexes, bandA_list=self.chunk_bandA, bandB_list=self.chunk_bandB, temporal_available=self.all_timestep_data_available, temporal_array=self.chunk_temporal, timesteps_provided=self.requested_timesteps)
+            eval_set = QualityModelFunctions.ImageLoader(device=device, indexes=self.chunk_indexes, bandA_list=self.batch_bandA, bandB_list=self.batch_bandB, temporal_available=self.all_timestep_data_available, temporal_array=self.chunk_temporal, timesteps_provided=self.requested_timesteps)
             # Set up DataLoader to iterate over samples
             dataloader = DataLoader(eval_set, batch_size=1, shuffle=False, drop_last=False)
 
@@ -601,8 +606,11 @@ class Sequence():
         background estimations for every image, using the specified method.'''
 
         #Select backgrounds from the previous chunk which overlap with the current chunk
-        self.bgs_A = [self.bgs_A[i] for i in self.overlap_indexes_in_chunk]
-        self.bgs_B = [self.bgs_B[i] for i in self.overlap_indexes_in_chunk]
+        try: #If we are iterating and have calculated overlap with the previous chunk
+            self.bgs_A = [self.bgs_A[i] for i in self.overlap_indexes_in_chunk]
+            self.bgs_B = [self.bgs_B[i] for i in self.overlap_indexes_in_chunk]
+        except: #Otherwise every index is "new"
+            self.new_indexes = self.chunk_indexes.copy()
 
         #If there are new pairs in this chunk, calculate their backgrounds:
         new_bgs_A = []
@@ -634,17 +642,19 @@ class Sequence():
 
                 new_items_added += 1
 
-    def calculate_absorbance(self):
+    def calculate_absorbance(self, correction=None):
         '''Calculate the absorbance for the current batch of data, assuming background images have been estimated.
         The result is stored as an array of shape [n_frames, height, width].'''
 
         existing_AA = True
         try:
             # Select absorbance values from the previous chunk which overlap with the current chunk
-            self.AA = self.AA[self.overlap_indexes_in_chunk, :, :]
-            self.AA.mask = self.AA[self.overlap_indexes_in_chunk, :, :].mask #Copy over the mask too
+            previous_chunk_AA = self.AA.copy()
+            self.AA = previous_chunk_AA[self.overlap_indexes_in_chunk, :, :].copy()
+            self.AA.mask = previous_chunk_AA[self.overlap_indexes_in_chunk, :, :].mask.copy() #Copy over the mask too
         except:
             existing_AA = False
+            self.AA = np.empty(shape=(0, self.img_shape[0], self.img_shape[1]))
 
         # If there are new pairs in this chunk, calculate their absorbance images:
         if len(self.new_indexes) != 0:
@@ -653,11 +663,13 @@ class Sequence():
             for new_index in self.new_indexes:
                 index_in_this_chunk = self.chunk_indexes.index(new_index) #Find the position of the data for this index in this chunk
                 AA_img = calculate_AA(self.batch_bandA[index_in_this_chunk], self.batch_bandB[index_in_this_chunk], self.bgs_A[index_in_this_chunk], self.bgs_B[index_in_this_chunk])
+                if correction != None:
+                    AA_img = correction(AA_img, self.flank_mask)
                 new_AA_array[new_calculated, :, :] = AA_img
                 new_AA_array[new_calculated, :, :].mask = AA_img.mask
                 new_calculated += 1
 
-        if len(self.overlap) == 0: #If this is an entirely distinct chunk from the previous, just save the AA images calculated for the new indexes
+        if self.AA.shape[0] == 0: #If this is an entirely distinct chunk from the previous, just save the AA images calculated for the new indexes
             self.AA = new_AA_array
             self.AA.mask = new_AA_array.mask
 
@@ -709,6 +721,34 @@ class Sequence():
                 self.spectra.append(corr_reading["Column density"].item())
             else:
                 print("ERROR: Multiple simultaneous spectrometer readings.")
+
+    def select_and_read_indexes_for_spectrometer_FOV_match(self, indexes=None, random_seed = 42):
+        '''Assuming that the quality indexes have been calculated and that spectrometer data
+        has been read in select image pairs indexes for the FOV match:
+        - filter for good quality data
+        - select non-zero and non-NAN sprecta values
+        - randomly select from these'''
+        random.seed(42)
+
+        if indexes == None:
+            all_indexes = np.arange(0, len(self.bandA_names))
+            good_quality_indexes = [i for i in all_indexes if self.all_precip_predictions[i] < 0.5]
+            good_quality_indexes = [i for i in good_quality_indexes if self.all_cloud_predictions[i] < 0.5]
+            print(good_quality_indexes)
+
+            if len(good_quality_indexes) > 100:
+                self.chunk_indexes = random.sample(good_quality_indexes, k=100)
+                self.chunk_indexes.sort()
+            else:
+                self.chunk_indexes = good_quality_indexes
+        else:
+            self.chunk_indexes = indexes
+
+        print("Reading data for spectrometer FOV match")
+
+        self.batch_bandA, self.batch_bandB, self.chunk_temporal = self.read_and_correct_selected_indexes(indexes_to_read=self.chunk_indexes, correct=True, temporal=True)
+
+
     def find_spectrometer_FOV(self, s=5, plot=True):
         '''Assuming that absorbance images have been calculated and spectrometer data is
         read in, run a cross-correlation to estimate the pixel at which the spectrometer
@@ -718,12 +758,12 @@ class Sequence():
         downsampling or averaging is used).'''
 
         #Create results array, with extra rows and columns to for ease of filling the downsampled results
-        correlation_vis = np.zeros((self.AA.shape[1] + s, self.AA.shape[2] + s))
+        correlation_vis = np.empty((self.AA.shape[1] + s, self.AA.shape[2] + s))
 
+        batch_spectra = [self.spectra[i] for i in self.chunk_indexes]
         for row in range(0, self.AA.shape[1], s):
             for column in range(0, self.AA.shape[2], s):
                 absorbance_series = self.AA[:, row, column]
-                batch_spectra = self.spectra[self.chunk_indicies[0]:self.chunk_indicies[-1] + 1]
                 #Only proceed if no element of the absorbance series is masked out (i.e all absorbance values exist)
                 if np.ma.is_masked(absorbance_series) == False:
                     correlation = pearsonr(absorbance_series, batch_spectra).statistic
@@ -737,6 +777,9 @@ class Sequence():
         n_cols = correlation_vis.shape[1]
         max_row = np.floor(max_flattened_index/n_cols)
         max_column = max_flattened_index - (max_row * n_cols)
+        print(max_column)
+        max_row = int(max_row)
+        max_column = int(max_column)
 
         if plot == True:
             fig, ax = plt.subplots()
@@ -746,9 +789,23 @@ class Sequence():
             ax.add_patch(circle)
             fig.colorbar(img, ax=ax)
             plt.show()
-        self.spec_CFOV = (max_row, max_column)
 
-    def calculate_calibration_curve(self):
+            fig2, ax2 = plt.subplots()
+            absorbance_to_plot = self.AA[:, max_row, max_column].copy()
+            mag_diff = np.sum(batch_spectra) / np.sum(absorbance_to_plot)
+            absorbance_to_plot = absorbance_to_plot * mag_diff
+            x_vals = np.arange(0, self.AA.shape[0])
+            ax2.plot(x_vals, absorbance_to_plot, label="Absorbance")
+            ax2.plot(x_vals, batch_spectra, label="Spectrometer CD")
+            plt.xlabel("Image count (selected for FOV match)")
+            plt.ylabel("AA (Scaled) and Column Density")
+            plt.legend()
+            plt.show()
+
+        self.spec_CFOV = (max_row, max_column)
+        print("Spectrometer CFOV: " + str(self.spec_CFOV))
+
+    def calculate_calibration_curve(self, plot=False):
         '''Assuming that spectrometer readings have been loaded, and that the FOV
         has been determined, calculate the calibration line using a least squares fit.
 
@@ -756,21 +813,22 @@ class Sequence():
         '''
 
         absorbance_inputs = self.AA[:,int(self.spec_CFOV[0]), int(self.spec_CFOV[1])]
-        spectra_target = self.spectra[self.chunk_indicies[0]:self.chunk_indicies[-1] + 1]
+        spectra_target = self.spectra[self.chunk_indexes[0]:self.chunk_indexes[-1] + 1]
         coeffs = np.polyfit(x=absorbance_inputs, y=spectra_target, deg=1)
         line_fn = np.poly1d(coeffs)
         self.calib_fn = line_fn
 
         #Plotting
-        fig, axs = plt.subplots()
-        axs.scatter(absorbance_inputs, spectra_target)
-        x_range = np.linspace(np.min(absorbance_inputs), np.max(absorbance_inputs))
-        line_y_vals = line_fn(x_range)
-        axs.plot(x_range, line_y_vals)
-        axs.set_xlabel("Apparent Absorbance")
-        axs.set_ylabel("Column density (molecules/cm^2)")
-        plt.title("Calibration curve")
-        plt.show()
+        if plot == True:
+            fig, axs = plt.subplots()
+            axs.scatter(absorbance_inputs, spectra_target)
+            x_range = np.linspace(np.min(absorbance_inputs), np.max(absorbance_inputs))
+            line_y_vals = line_fn(x_range)
+            axs.plot(x_range, line_y_vals)
+            axs.set_xlabel("Apparent Absorbance")
+            axs.set_ylabel("Column density (molecules/cm^2)")
+            plt.title("Calibration curve")
+            plt.show()
 
     def calibrate_AA(self):
         '''Assuming absorbance images and the calibration curve have been computed,
@@ -791,11 +849,129 @@ class Sequence():
         self.CD = self.CD * multiplier
         show(self.CD[-1,:,:], cmap="YlGnBu_r")
 
-    def calculate_pixel_geometry(self, geom_data):
-        '''Input camera coordinates, real-world and camera coordinates of a feature in the image.
-        We want to calculate for each pixel the real world coordinates of its corners.'''
+class CameraGeometry():
 
-        #
+    def __init__(self, volcano_dictionary, camera_dictionary):
+        '''Initialise the camera geometry, readin in the relevant infomration from the
+        volcano dictionary.'''
+
+        self.cam_lat = volcano_dictionary['cam_lat'] #Position of the camera
+        self.cam_lon = volcano_dictionary['cam_lon']
+
+        self.cam = geonum.GeoPoint(self.cam_lat, self.cam_lon, name="camera", auto_topo_access=True)
+
+        self.cam_height = volcano_dictionary['cam_height'] #Height of the camera above the ground
+        if self.cam_height != None:
+            self.cam.altitude += self.cam_height
+
+        self.ref_lat = volcano_dictionary['ref_lat'] #Position of the reference point in real world coords
+        self.ref_lon = volcano_dictionary['ref_lon']
+        self.ref = geonum.GeoPoint(self.ref_lat, self.ref_lon, name="ref", auto_topo_access=True)
+        self.ref_pixel_coords = volcano_dictionary['ref_pixel_coords'] #POsition of the reference point in the image coordinates
+
+        self.crater_lat = volcano_dictionary['crater_lat']
+        self.crater_lon = volcano_dictionary['crater_lon']
+        self.crater = geonum.GeoPoint(self.crater_lat, self.crater_lon, name="crater", auto_topo_access=True)
+
+        self.pixel_count = camera_dictionary['pixels']
+        self.cam_FOV_angle = camera_dictionary['FOV_angle']
+
+    def calculate_camera_angle(self):
+        '''Based on the provided camera and source coordinates, and the pixel index of the vent in the image,
+        calculate the azimuth and elevation angle of the camera.'''
+        print("Calculating camera angle:")
+
+        self.cam_to_ref = self.ref - self.cam
+        self.cam_to_ref.set_anchor(self.cam)
+
+        #Calculate the angle of the vector between the camera position and vent position
+        source_elev = self.cam_to_ref.elevation
+        source_azim = self.cam_to_ref.azimuth
+        #Calculate the angle at which the camera must be pointing (the angle required to bring the secified pixel to the CFOV, plus the angle to bring the CFOV to the source location)
+
+        if self.pixel_count[0] % 2 != 0:
+            print("ERROR: Geometry calc assumes image dimensions are divisible by two.")
+        elif self.pixel_count[1] % 2 != 0:
+            print("ERROR: Geometry calc assumes image dimensions are divisible by two.")
+
+        angular_steps_h = self.ref_pixel_coords[1] - (self.pixel_count[1]/2) - 0.5
+        angular_steps_v = self.ref_pixel_coords[0] - (self.pixel_count[0]/2) - 0.5
+        alpha_h = self.cam_FOV_angle[1] / self.pixel_count[1]
+        alpha_v = self.cam_FOV_angle[0] / self.pixel_count[0]
+        print("Horizontal pixel size: " + str(alpha_h) + " deg")
+        print("Vertical pixel size: " + str(alpha_v) + " deg")
+        self.cfov_azim = -1 * angular_steps_h * alpha_h + source_azim
+        self.cfov_elev = angular_steps_v * alpha_v + source_elev
+
+        print("Camera CFOV elevation angle: " + str(self.cfov_elev))
+        print("Camera CFOV elevation azimuth: " + str(self.cfov_azim))
+
+    def calculate_CFOV_location(self):
+        '''
+        Assume that the image plane is vertical and runs through the crater center, perpendicular to the vector from camera to CFOV.
+        '''
+
+        #Find the azimuth angle of the vector from the camera to the crater
+        self.cam_to_crater = self.crater - self.cam
+        self.cam_to_crater.set_anchor(self.cam)
+
+        #Create a vector which is on the plane running through the crater center, perfectly vertical and at an angle perpendicular to the
+        #long and lat components of the CFOV line (when viewed from a birds eye above).
+        if self.cfov_azim >= self.cam_to_crater.azimuth:
+            offset_angle = 90 #TODO this may fail if the cfov azim is near 180 or -180
+        else:
+            offset_angle = -90
+        self.plane_vector = geonum.GeoVector3D(azimuth=self.cfov_azim + offset_angle, elevation=0, dist_hor=self.cam_to_crater.dist_hor/2, name="img_plane_direction")
+        self.plane_vector.set_anchor(self.crater)
+
+        #Create a vector extending from the camera, along the CFOV, far beyond the image plane
+        self.cfov_vector = geonum.GeoVector3D(azimuth=self.cfov_azim, dist_hor=self.cam_to_crater.dist_hor * 2, elevation=self.cfov_elev)
+        self.cfov_vector.set_anchor(self.cam)
+
+        #Then find the horizontal point of intersection of these vectors
+        self.horizontal_cam_to_poi = self.cfov_vector.intersect_hor(self.plane_vector) #Vector extending from cam to poi (but only lon and lat components)
+        #Calculate the vertical component:
+        self.cam_to_poi_dz = np.tan((self.cfov_elev/180) * np.pi) * self.horizontal_cam_to_poi.dist_hor * 1000 #Using trigonometry
+        #Add the calculated offsets to the camera position to find the POI
+        self.cfov = self.cam.offset(azimuth=self.horizontal_cam_to_poi.azimuth, dist_hor=self.horizontal_cam_to_poi.dist_hor, dist_vert=self.cam_to_poi_dz)
+        self.cfov.name="CFOV"
+        print(self.cfov)
+
+    def plot_camera_geometry(self):
+        s = geonum.GeoSetup()
+        s.add_geo_points(self.cam, self.crater, self.ref)
+        s.set_borders_from_points()
+
+        self.cam_to_cfov = self.cfov - self.cam
+        self.cam_to_cfov.set_anchor(self.cam)
+        s.add_geo_vectors(self.cam_to_crater, self.cam_to_cfov, self.plane_vector)
+
+        map2D = s.plot_2d()
+        plt.show()
+
+        #map3D = s.plot_3d()
+
+    def map_img_coords_to_world_plane(self):
+        '''Take in a 3D array of size wxhx2 which holds X and Y
+        coordinates (in pixels) for wxh points.
+        Calculate and return the X and Y coordinates of each point
+        on the true-size image plane with axes centered at the CFOV.'''
+
+        #TODO ignore any masked points
+
+        #Calculate the height of the CFOV (ignoring the height the altitude of the camera)
+        h_cfov = self.cam_to_cfov.dist_hor * np.tan((self.cfov_elev/180) * np.pi)
+        print(h_cfov)
+        #Check this matches the geonum point! - Yes :)
+
+        #TODO for each point calculate the height above or below the COFV
+
+        #TODO calculate the x-distance of each pixel from the CFOV
+
+
+
+
+
 
 
 
