@@ -46,7 +46,7 @@ cam_geom = CameraGeometry(Reventador_2022_dictionary, camera_dictionary)
 cam_geom.calculate_camera_angle()
 cam_geom.calculate_CFOV_location()
 cam_geom.plot_camera_geometry()
-cam_geom.map_img_coords_to_world_plane()
+cam_geom.calculate_pixel_sizes()
 
 #Apply quality models for the whole sequence, and save the predictions to two arrays.
 #This is run by loading batches of images at a time, to avoid overwhelming the memory.

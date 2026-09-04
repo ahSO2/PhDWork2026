@@ -17,9 +17,11 @@ from scipy.stats import pearsonr
 import torch
 from torch.utils.data import DataLoader
 
-def show(image, cmap="gray"):
+def show(image, cmap="gray", title=None):
     plt.imshow(image, cmap=cmap)
     plt.colorbar()
+    if title != None:
+        plt.title(title)
     plt.show()
 
 
@@ -852,7 +854,7 @@ class Sequence():
 class CameraGeometry():
 
     def __init__(self, volcano_dictionary, camera_dictionary):
-        '''Initialise the camera geometry, readin in the relevant infomration from the
+        '''Initialise the camera geometry variables, reading in the relevant information from the
         volcano dictionary.'''
 
         self.cam_lat = volcano_dictionary['cam_lat'] #Position of the camera
@@ -863,6 +865,12 @@ class CameraGeometry():
         self.cam_height = volcano_dictionary['cam_height'] #Height of the camera above the ground
         if self.cam_height != None:
             self.cam.altitude += self.cam_height
+        self.pixel_count = camera_dictionary['pixels']
+        self.cam_FOV_angle = camera_dictionary['FOV_angle']
+        self.alpha_h = self.cam_FOV_angle[1] / self.pixel_count[1]
+        self.alpha_v = self.cam_FOV_angle[0] / self.pixel_count[0]
+        print("Horizontal pixel size: " + str(self.alpha_h) + " deg")
+        print("Vertical pixel size: " + str(self.alpha_v) + " deg")
 
         self.ref_lat = volcano_dictionary['ref_lat'] #Position of the reference point in real world coords
         self.ref_lon = volcano_dictionary['ref_lon']
@@ -873,8 +881,6 @@ class CameraGeometry():
         self.crater_lon = volcano_dictionary['crater_lon']
         self.crater = geonum.GeoPoint(self.crater_lat, self.crater_lon, name="crater", auto_topo_access=True)
 
-        self.pixel_count = camera_dictionary['pixels']
-        self.cam_FOV_angle = camera_dictionary['FOV_angle']
 
     def calculate_camera_angle(self):
         '''Based on the provided camera and source coordinates, and the pixel index of the vent in the image,
@@ -887,30 +893,27 @@ class CameraGeometry():
         #Calculate the angle of the vector between the camera position and vent position
         source_elev = self.cam_to_ref.elevation
         source_azim = self.cam_to_ref.azimuth
-        #Calculate the angle at which the camera must be pointing (the angle required to bring the secified pixel to the CFOV, plus the angle to bring the CFOV to the source location)
 
+        #Calculate the angle at which the camera must be pointing (the angle required to bring the secified pixel to the CFOV, plus the angle to bring the CFOV to the source location)
         if self.pixel_count[0] % 2 != 0:
             print("ERROR: Geometry calc assumes image dimensions are divisible by two.")
         elif self.pixel_count[1] % 2 != 0:
             print("ERROR: Geometry calc assumes image dimensions are divisible by two.")
-
+        # How many pixel steps from the CFOV is the reference point?
         angular_steps_h = self.ref_pixel_coords[1] - (self.pixel_count[1]/2) - 0.5
         angular_steps_v = self.ref_pixel_coords[0] - (self.pixel_count[0]/2) - 0.5
-        alpha_h = self.cam_FOV_angle[1] / self.pixel_count[1]
-        alpha_v = self.cam_FOV_angle[0] / self.pixel_count[0]
-        print("Horizontal pixel size: " + str(alpha_h) + " deg")
-        print("Vertical pixel size: " + str(alpha_v) + " deg")
-        self.cfov_azim = -1 * angular_steps_h * alpha_h + source_azim
-        self.cfov_elev = angular_steps_v * alpha_v + source_elev
+        self.cfov_azim = -1 * angular_steps_h * self.alpha_h + source_azim
+        self.cfov_elev = angular_steps_v * self.alpha_v + source_elev
 
         print("Camera CFOV elevation angle: " + str(self.cfov_elev))
         print("Camera CFOV elevation azimuth: " + str(self.cfov_azim))
 
     def calculate_CFOV_location(self):
         '''
+        Calculate the intersection of the CFOV of the camera with the image plane.
         Assume that the image plane is vertical and runs through the crater center, perpendicular to the vector from camera to CFOV.
         '''
-
+        print("Calculating CFOV location on image plane.")
         #Find the azimuth angle of the vector from the camera to the crater
         self.cam_to_crater = self.crater - self.cam
         self.cam_to_crater.set_anchor(self.cam)
@@ -918,32 +921,35 @@ class CameraGeometry():
         #Create a vector which is on the plane running through the crater center, perfectly vertical and at an angle perpendicular to the
         #long and lat components of the CFOV line (when viewed from a birds eye above).
         if self.cfov_azim >= self.cam_to_crater.azimuth:
-            offset_angle = 90 #TODO this may fail if the cfov azim is near 180 or -180
+            offset_angle = 90 #TODO Does this work if the cfov azim is near 180 or -180?
         else:
             offset_angle = -90
         self.plane_vector = geonum.GeoVector3D(azimuth=self.cfov_azim + offset_angle, elevation=0, dist_hor=self.cam_to_crater.dist_hor/2, name="img_plane_direction")
         self.plane_vector.set_anchor(self.crater)
 
         #Create a vector extending from the camera, along the CFOV, far beyond the image plane
-        self.cfov_vector = geonum.GeoVector3D(azimuth=self.cfov_azim, dist_hor=self.cam_to_crater.dist_hor * 2, elevation=self.cfov_elev)
-        self.cfov_vector.set_anchor(self.cam)
+        self.cfov_dir_vector = geonum.GeoVector3D(azimuth=self.cfov_azim, dist_hor=self.cam_to_crater.dist_hor * 2, elevation=self.cfov_elev)
+        self.cfov_dir_vector.set_anchor(self.cam)
 
         #Then find the horizontal point of intersection of these vectors
-        self.horizontal_cam_to_poi = self.cfov_vector.intersect_hor(self.plane_vector) #Vector extending from cam to poi (but only lon and lat components)
+        self.horizontal_cam_to_poi = self.cfov_dir_vector.intersect_hor(self.plane_vector) #Vector extending from cam to poi (but only lon and lat components)
         #Calculate the vertical component:
         self.cam_to_poi_dz = np.tan((self.cfov_elev/180) * np.pi) * self.horizontal_cam_to_poi.dist_hor * 1000 #Using trigonometry
         #Add the calculated offsets to the camera position to find the POI
         self.cfov = self.cam.offset(azimuth=self.horizontal_cam_to_poi.azimuth, dist_hor=self.horizontal_cam_to_poi.dist_hor, dist_vert=self.cam_to_poi_dz)
         self.cfov.name="CFOV"
-        print(self.cfov)
+
+        #Vector from camera extending exactly to CFOV which is used for plotting later
+        self.cam_to_cfov = self.cfov - self.cam
+        self.cam_to_cfov.set_anchor(self.cam)
+
 
     def plot_camera_geometry(self):
+        print("Creating plot of camera geometry with geonum package.")
+
         s = geonum.GeoSetup()
         s.add_geo_points(self.cam, self.crater, self.ref)
         s.set_borders_from_points()
-
-        self.cam_to_cfov = self.cfov - self.cam
-        self.cam_to_cfov.set_anchor(self.cam)
         s.add_geo_vectors(self.cam_to_crater, self.cam_to_cfov, self.plane_vector)
 
         map2D = s.plot_2d()
@@ -951,10 +957,10 @@ class CameraGeometry():
 
         #map3D = s.plot_3d()
 
-    def map_img_coords_to_world_plane(self):
-        '''Take in a 3D array of size wxhx2 which holds X and Y
-        coordinates (in pixels) for wxh points.
-        Calculate and return the X and Y coordinates of each point
+    def map_img_coords_to_world_plane(self, coords_array):
+        '''Take in a 3D array of size height x width x 2 which holds Y and X
+        coordinates (in pixels) for hxw points.
+        Calculate and return the Y and X coordinates of each point
         on the true-size image plane with axes centered at the CFOV.'''
 
         #TODO ignore any masked points
@@ -964,11 +970,67 @@ class CameraGeometry():
         print(h_cfov)
         #Check this matches the geonum point! - Yes :)
 
-        #TODO for each point calculate the height above or below the COFV
+        #For each point calculate the height above or below the COFV
+        vertical_coords = coords_array[:,:,0]
+        angles_within_img = (self.pixel_count[0] - vertical_coords) * self.alpha_v
+        image_base_angle = self.cfov_elev - self.cam_FOV_angle[0]/2
+        angles_with_horiz = angles_within_img + image_base_angle
+        #show(angles_with_horiz)
+        heights_rel_cfov = self.cam_to_cfov.dist_hor * np.tan((angles_with_horiz/180) * np.pi) - h_cfov
+        #show(heights_rel_cfov)
 
-        #TODO calculate the x-distance of each pixel from the CFOV
+        #Calculate the x-distance of each point from the CFOV
+        horizontal_coords = coords_array[:,:,1]
+        #Calculate distance along the cfov from plane to camera
+        d_cam_cfov = self.cam_to_cfov.magnitude
+        #Calculate the angle from the cfov
+        horiz_angles_from_cfov = (horizontal_coords - self.pixel_count[1]/2) * self.alpha_h
+        #show(horiz_angles_from_cfov)
+        #Calculate distances
+        horiz_pos_rel_cfov = np.tan((horiz_angles_from_cfov/180) * np.pi) * d_cam_cfov
+        #show(horiz_pos_rel_cfov)
 
+        return np.stack(arrays=[heights_rel_cfov, horiz_pos_rel_cfov], axis=-1)
 
+    def calculate_pixel_sizes(self):
+        '''Calculate the height, width and area of each pixel in real-world image plane.'''
+        #Let pixel coordinates indicate the top left of that pixel
+        #X is horixontal direction (index 1), Y is vertical direction (index 0)
+        x_vals = np.arange(0, self.pixel_count[1])
+        y_vals = np.arange(0, self.pixel_count[0])
+        X, Y = np.meshgrid(x_vals, y_vals)
+
+        coords_array = np.stack(arrays=[Y, X], axis=-1)
+        world_coords_tl = self.map_img_coords_to_world_plane(coords_array)
+        world_coords_br = self.map_img_coords_to_world_plane(coords_array + 1)
+        pixel_widths = world_coords_br[:,:,1] - world_coords_tl[:,:,1]
+        pixel_heights = world_coords_tl[:,:,0] - world_coords_br[:,:,0]
+
+        show(pixel_widths, title="Pixel Widths")
+        show(pixel_heights, title="Pixel Heights")
+        pixel_areas = np.multiply(pixel_widths, pixel_heights)
+        show(pixel_areas, title="Pixel Areas")
+
+        real_image_size = (world_coords_tl[0,0,0] - world_coords_br[-1,-1,0], world_coords_br[-1,-1,1] - world_coords_tl[0,0,1])
+        print(real_image_size)
+
+class IntegrationObject():
+    '''Class to represent line or circle to integrate over.
+    Any line or circle should be a collection of pixels which
+    intersect that line, plus the length of each intersection.
+    We also want to know the direction perpendicular to the
+    line at every pixel.'''
+
+    def __init__(self):
+        pass
+
+class Line(IntegrationObject):
+    def __init__(self):
+        #Provide the two endpoints
+
+class Circle(IntegrationObject):
+    def __init__(self):
+        #Provide the center point and radius
 
 
 
