@@ -869,8 +869,22 @@ class Sequence():
         self.cam_geom = CamGeomObject
 
     def set_integration_circle(self, c, r):
-        IC = Circle(c, r, self.cam_geom.pixel_count, self.flank_mask)
+        IC = Circle(c, r, self.cam_geom.pixel_count, self.flank_mask, self.cam_geom)
         IC.calculate_intersection_lengths(self.cam_geom)
+
+    def calculate_flux(self, i):
+        '''Calculate flux based on the AA for the given image index,
+        and the last calculated flow.'''
+        index_in_batch = self.chunk_indexes.index(i)
+        #Convert flow field into units of meters
+        flow_m = self.cam_geom.convert_velocity_to_ms(self.velos[-1])
+        kg_per_ts = self.IC.integrate1D(flow_m=flow_m, pixel_vals=self.batch_bandA[index_in_batch])
+        timestep_len = self.times[i + 1] - self.times[i]
+        kg_per_s = kg_per_ts / timestep_len.seconds
+        self.flux.append(kg_per_s)
+        print("Flux: ")
+        print(str(kg_per_s) + "kg/s")
+
 
 class CameraGeometry():
 
@@ -1024,27 +1038,23 @@ class CameraGeometry():
         coords_array = np.stack(arrays=[Y, X], axis=-1)
         world_coords_tl = self.map_img_coords_to_world_plane(coords_array)
         world_coords_br = self.map_img_coords_to_world_plane(coords_array + 1)
-        pixel_widths = world_coords_br[:,:,1] - world_coords_tl[:,:,1]
-        pixel_heights = world_coords_tl[:,:,0] - world_coords_br[:,:,0]
+        pixel_widths = world_coords_br[:,:,1] - world_coords_tl[:,:,1] * 1000
+        pixel_heights = world_coords_tl[:,:,0] - world_coords_br[:,:,0] * 1000
 
         if plot == True:
-            show(pixel_widths, title="Pixel Widths")
-            show(pixel_heights, title="Pixel Heights")
+            show(pixel_widths, title="Pixel Widths (m)")
+            show(pixel_heights, title="Pixel Heights (m)")
             pixel_areas = np.multiply(pixel_widths, pixel_heights)
-            show(pixel_areas, title="Pixel Areas")
+            show(pixel_areas, title="Pixel Areas (m^2)")
 
         real_image_size = (world_coords_tl[0,0,0] - world_coords_br[-1,-1,0], world_coords_br[-1,-1,1] - world_coords_tl[0,0,1])
-        print("Real-world image plane size: ")
+        print("Real-world image plane size (km): ")
         print(real_image_size)
 
-    #def convert_vector_field_to_m(self, field):
-    #    '''Take in a vector field where each component is in pixel units.
-    #    Convert to units of meters.#
-
-    #    field[0] = dx (horizontal)
-    #    field[1] = dy (vertical)
-    #    '''
-    #    pass
+    def convert_velocity_to_ms(self, field):
+        '''Assuming each vector's origin is at the center of the pixel,
+        calculate the horizontal and vertical components in real-world
+        size.'''
 
 
 class IntegrationObject():
@@ -1057,19 +1067,16 @@ class IntegrationObject():
     def __init__(self):
         pass
 
-    def integrate1D(self, velocity_array):
-        '''Integration which is 1D in the sense of Peters and Oppenheimer (2018).'''
-    # TODO take dot product of the unit normals with the velo
-    # vector at each pixel
-    #dot = np.multiply(n_x, flow[:, :, 0]) + np.multiply(n_y, flow[:, :, 1])
+    def integrate1D(self, flow_m, pixel_vals):
+        '''Calculate the flux over this object (integration in 1D in the sense of Peters and Oppenheimer (2018)).
+        Assume flow[0] = dx , flow[1] = dy. '''
+        # Take dot product of the unit normals with the velocity vector at each pixel
+        dot = np.multiply(self.normals[:,:,0], flow_m[:, :, 0]) + np.multiply(self.normals[:,:,1], flow_m[:, :, 1])
 
-    #TODO multiply the contribution from each pixel by the arc length at that pixel
-    #arc_lengths = calculate_intersection_lengths(boundary_points, circle_center, circle_radius)
-
-    #TODO sum the values
-    #contributions = np.multiply(arc_lengths, np.multiply(frame1, dot))
-    #intensity_flux_1D = np.sum(contributions)
-    pass
+        #Multiply the contribution from each pixel by the arc length at that pixel
+        contributions = np.multiply(self.intersections, np.multiply(pixel_vals, dot))
+        flux_1D = np.sum(contributions)
+        return flux_1D
 
 class Line(IntegrationObject):
     def __init__(self):
@@ -1077,7 +1084,7 @@ class Line(IntegrationObject):
         pass
 
 class Circle(IntegrationObject):
-    def __init__(self, c, r, img_shape, flank_mask):
+    def __init__(self, c, r, img_shape, flank_mask, CamGeomObject):
         '''c=(along, down)'''
         self.c = c
         self.r = r
@@ -1091,25 +1098,35 @@ class Circle(IntegrationObject):
 
         #Calculate the unit normal for each point
         #(take vector from center to that point, then scale so magnitude is one)
-        x_coords = np.linspace(0, img_shape[1] - 1, img_shape[1])
-        y_coords = np.linspace(0, img_shape[0] - 1, img_shape[0])
-        # First create arrays of the x and y coords
-        X, Y = np.meshgrid(x_coords, y_coords)
-        n_x = X - c[0]
-        n_y = Y - c[1]
+        #Create arrays of the x and y coordinates (in real world coords)
+        x_vals = np.arange(0, img_shape[1])
+        y_vals = np.arange(0, img_shape[0])
+        X, Y = np.meshgrid(x_vals, y_vals)
+        coords_array = np.stack(arrays=[Y, X], axis=-1)
+        #Adding 0.5 below to convert to coord system used for Camera Geometry class
+        world_coords_pixel_centers = CamGeomObject.map_img_coords_to_world_plane(coords_array + 0.5)
+        world_coords_pixel_centers = world_coords_pixel_centers * 1000 #Conversion to m from km
+
+        center_coord = world_coords_pixel_centers[c[1], c[0], :]
+        n_x = world_coords_pixel_centers[:,:,1] - (center_coord[0] + 0.5)
+        n_y = world_coords_pixel_centers[:,:,0] - (center_coord[1] + 0.5)
         n_m = np.sqrt(np.square(n_x) + np.square(n_y))
         n_x = np.divide(n_x, n_m)
         n_y = np.divide(n_y, n_m)
-        # Set the nromal at the center point equal to zero rather than invalid value
+        # Set the normal at the center point equal to zero rather than invalid value
         n_x[c[1], c[0]] = 0
         n_y[c[1], c[0]] = 0
         self.normals = np.stack([n_x, n_y], axis=-1)
+        show(n_x)
+        show(n_y)
 
     def calculate_intersection_lengths(self, CamGeomObject):
         '''Calculate the length of true circle intersecting with each pixel,
         converted into meters.'''
         print("Calculating intersection of integration line with each pixel.")
         intersection_points = calculate_intersection_points(self.points, self.c, self.r)
+        #Convert to coordinates used for my geometry functions (top left edge of pixel is (0,0) rather than center)
+        intersection_points += 0.5 #This does introduce nonzero values for pixels with no true POIs, but we will end up with a zero value in the distance calulation anyway
         #POIs of circle with each pixel in form [pixel_x_coord, pixel_y_coord, 0=POI1 1=POI2, 0=x_coord 1=y_coord]
         first_intersection_points = intersection_points[:,:,0,:]
         second_intersection_points = intersection_points[:,:,1,:]
@@ -1124,7 +1141,7 @@ class Circle(IntegrationObject):
 
         #Calculate distances
         sum = np.square(first_IP_m[:,:,0] - second_IP_m[:,:,0]) + np.square(first_IP_m[:,:,1] - second_IP_m[:,:,1])
-        self.intersection_lengths = np.sqrt(sum)
+        self.intersection_lengths = np.sqrt(sum) * 1000
         show(self.intersection_lengths, title="Intersection Lengths (m)")
 
 

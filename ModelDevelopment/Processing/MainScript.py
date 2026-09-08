@@ -46,9 +46,9 @@ cam_geom = CameraGeometry(Reventador_2022_dictionary, camera_dictionary)
 cam_geom.calculate_camera_angle()
 cam_geom.calculate_CFOV_location()
 #cam_geom.plot_camera_geometry()
-#cam_geom.calculate_pixel_sizes()
+cam_geom.calculate_pixel_sizes()
 reventador_sequence.set_cam_geom(cam_geom)
-reventador_sequence.set_integration_circle(c=(150,200), r=5)
+reventador_sequence.set_integration_circle(c=(400,300), r=100)
 
 #Apply quality models for the whole sequence, and save the predictions to two arrays.
 #This is run by loading batches of images at a time, to avoid overwhelming the memory.
@@ -83,6 +83,8 @@ for i in range(0, len(reventador_sequence.bandA_names)):
     reventador_sequence.calibrate_AA()
     reventador_sequence.convert_molecules_to_mass()
     reventador_sequence.estimate_velocity_2D(i=i, method=ones)
+    reventador_sequence.calculate_flux(i=i)
+
     if i in [1, len(reventador_sequence.bandA_names)-1]:
         for chunk_i in range(0, len(reventador_sequence.chunk_indexes)):
             img_A = reventador_sequence.batch_bandA[chunk_i]
