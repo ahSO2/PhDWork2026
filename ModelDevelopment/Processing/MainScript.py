@@ -26,27 +26,29 @@ Reventador_2022_dictionary = {"volcano_dictionary_name":"Reventador2022",
                               'crater_lat':-0.0806186, #Coordinates of the center of the crater (used to define the distance of the image plane from the camera)
                               'crater_lon':-77.6578386}
 
-camera_dictionary = {'pixels':(486, 648),
+camera_dictionary = {'res':(486, 648),
                      'FOV_angle':(21, 28)}
 
-geom_data = {'plume_dir_azim': None #Direction of the plume (based on wind direction). If None given, assumed to be perpendicular to camera plane if not given.
+geom_data = {'plume_dir_azim': None #TODO currently not used in my code #Direction of the plume (based on wind direction).
              }
 
 background_method = constant_ratio_assumption
+velocity_method = ones
 spectrometer_CFOV = (55, 305)
 
 ######################## Processing ########################################
-
 reventador_sequence = Sequence()
-reventador_sequence.img_shape = camera_dictionary['pixels']
+reventador_sequence.img_shape = camera_dictionary['res']
 reventador_sequence.set_volcano_dictionary(Reventador_2022_dictionary)
 reventador_sequence.initialise_and_match_full_sequence("E:/Reventador/2022/2022-04-24/Seq_2")
 
 cam_geom = CameraGeometry(Reventador_2022_dictionary, camera_dictionary)
 cam_geom.calculate_camera_angle()
 cam_geom.calculate_CFOV_location()
-cam_geom.plot_camera_geometry()
-cam_geom.calculate_pixel_sizes()
+#cam_geom.plot_camera_geometry()
+#cam_geom.calculate_pixel_sizes()
+reventador_sequence.set_cam_geom(cam_geom)
+reventador_sequence.set_integration_circle(c=(150,200), r=5)
 
 #Apply quality models for the whole sequence, and save the predictions to two arrays.
 #This is run by loading batches of images at a time, to avoid overwhelming the memory.
@@ -80,6 +82,7 @@ for i in range(0, len(reventador_sequence.bandA_names)):
     reventador_sequence.calculate_calibration_curve(plot=True)
     reventador_sequence.calibrate_AA()
     reventador_sequence.convert_molecules_to_mass()
+    reventador_sequence.estimate_velocity_2D(i=i, method=ones)
     if i in [1, len(reventador_sequence.bandA_names)-1]:
         for chunk_i in range(0, len(reventador_sequence.chunk_indexes)):
             img_A = reventador_sequence.batch_bandA[chunk_i]
