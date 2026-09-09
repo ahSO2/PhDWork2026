@@ -3,25 +3,26 @@ import numpy as np
 '''Some larger functions used to calculate intersections of pixels with geometric shapes.'''
 
 def calculate_circle_points(image_dim, center, radius):
-    '''Identify which pixels intersect with the defined circle.'''
+    '''Identify which pixels intersect with the defined circle.
+    center = (down, across).'''
 
-    lhs = max(0, center[0] - radius)
-    rhs = min(image_dim[1] - 1, center[0] + radius)
+    lhs = max(0, center[1] - radius)
+    rhs = min(image_dim[1] - 1, center[1] + radius)
     x_range = (lhs, rhs)
-    top = max(0, center[1] - radius)
-    bottom = min(image_dim[0] - 1, center[1] + radius)
+    top = max(0, center[0] - radius)
+    bottom = min(image_dim[0] - 1, center[0] + radius)
     y_range = (top, bottom)
 
     #For each x-value, find and plot corresponding y-values:
     x_to_consider = np.linspace(x_range[0], x_range[1], (x_range[1] - x_range[0] + 1) * 10)
 
-    y_sq = np.ones_like(x_to_consider) * radius**2 - np.square(x_to_consider- np.ones_like(x_to_consider) * center[0])
+    y_sq = np.ones_like(x_to_consider) * radius**2 - np.square(x_to_consider- np.ones_like(x_to_consider) * center[1])
     y_rt = np.sqrt(y_sq)
 
-    y1_vals = y_rt + np.ones_like(x_to_consider) * center[1]
+    y1_vals = y_rt + np.ones_like(x_to_consider) * center[0]
     y1_vals = np.round(y1_vals, 0).astype(int)
 
-    y2_vals = -y_rt + np.ones_like(x_to_consider) * center[1]
+    y2_vals = -y_rt + np.ones_like(x_to_consider) * center[0]
     y2_vals = np.round(y2_vals, 0).astype(int)
 
     array = np.zeros(shape=image_dim)
@@ -34,13 +35,13 @@ def calculate_circle_points(image_dim, center, radius):
     #Then for each y-value, find and plot corresponding x-vals
     y_to_consider = np.linspace(y_range[0], y_range[1], (y_range[1] - y_range[0] + 1) * 10)
 
-    x_sq = np.ones_like(y_to_consider) * radius ** 2 - np.square(y_to_consider - np.ones_like(y_to_consider) * center[1])
+    x_sq = np.ones_like(y_to_consider) * radius ** 2 - np.square(y_to_consider - np.ones_like(y_to_consider) * center[0])
     x_rt = np.sqrt(x_sq)
 
-    x1_vals = x_rt + np.ones_like(y_to_consider) * center[0]
+    x1_vals = x_rt + np.ones_like(y_to_consider) * center[1]
     x1_vals = np.round(x1_vals, 0).astype(int)
 
-    x2_vals = -x_rt + np.ones_like(y_to_consider) * center[0]
+    x2_vals = -x_rt + np.ones_like(y_to_consider) * center[1]
     x2_vals = np.round(x2_vals, 0).astype(int)
 
     y_to_plot = np.round(y_to_consider, 0).astype(int)
@@ -57,17 +58,17 @@ def dist(p1, p2):
 
 def find_POI_vertical_line(x, c, r, point_approx):
     '''
-    Find the POI between line x=x and circle with given center and radius.
+    Find the POI between line x=x and circle with given center (down, across) and radius.
     Return the value closest to the given y-value.
     :return:
     '''
 
-    y_sqr = r**2 - (x-c[0])**2
+    y_sqr = r**2 - (x-c[1])**2
     if y_sqr >= 0:
         #If a solution exists:
         y_rt = np.sqrt(y_sqr)
-        y1 = y_rt + c[1]
-        y2 = -y_rt + c[1]
+        y1 = y_rt + c[0]
+        y2 = -y_rt + c[0]
         #Take the one closest to the y-val of given.
         if (point_approx[1] - 0.5) <= y1 < (point_approx[1] + 0.5):
             return y1
@@ -80,17 +81,17 @@ def find_POI_vertical_line(x, c, r, point_approx):
 
 def find_POI_horizontal_line(y, c, r, point_approx):
     '''
-        Find the POI between line y=y and circle with given center and radius.
+        Find the POI between line y=y and circle with given center (down, across) and radius.
         Return the value closest to the given x-value.
         :return:
         '''
 
-    x_sqr = r ** 2 - (y - c[1]) ** 2
+    x_sqr = r ** 2 - (y - c[0]) ** 2
     if x_sqr >= 0:
         # If a solution exists:
         x_rt = np.sqrt(x_sqr)
-        x1 = x_rt + c[0]
-        x2 = - x_rt + c[0]
+        x1 = x_rt + c[1]
+        x2 = - x_rt + c[1]
         # Take the one closest to the y-val of given.
         if (point_approx[0] - 0.5) <= x1 < (point_approx[0] + 0.5):
             return x1
@@ -108,13 +109,13 @@ def calculate_intersection_points(all_points, c, r):
     Intakes a set of points and returns the length of the "chunk" of the circle
     which intersects the pixel centered at each point, approximated by a straight line.
     :param all_points: Array containing pixels for which to calculate the intersection.
-    :param circle_center: (x, y) as in (horizontal, vertical)
-    :param circle_raidus: radius of circle to consider.
+    :param circle_center: (y, x) as in (vertical, horizontal)
+    :param circle_radius: radius of circle to consider.
     :return:
     '''
     n_poi = np.zeros_like(all_points)
     arc_lengths = np.zeros_like(all_points).astype(np.float32)
-    intersection_coords = np.zeros(shape=(all_points.shape[0], all_points.shape[1], 2, 2)) #Shape [pixel_x_coord, pixel_y_coord, POI 1 or 2, POI coord]
+    intersection_coords = np.zeros(shape=(all_points.shape[0], all_points.shape[1], 2, 2)) #Shape [pixel_y_coord, pixel_x_coord, POI 1 or 2, POI coord]
     for x in range(0, all_points.shape[1]):
         for y in range(0, all_points.shape[0]):
             POIs = []

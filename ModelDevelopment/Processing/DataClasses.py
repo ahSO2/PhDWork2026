@@ -109,6 +109,7 @@ class Sequence():
         self.bgs_A = []
         self.bgs_B = []
         self.velos = []
+        self.flux = []
 
 
 
@@ -741,8 +742,8 @@ class Sequence():
             good_quality_indexes = [i for i in good_quality_indexes if self.all_cloud_predictions[i] < 0.5]
             print(good_quality_indexes)
 
-            if len(good_quality_indexes) > 100:
-                self.chunk_indexes = random.sample(good_quality_indexes, k=100)
+            if len(good_quality_indexes) > 50:
+                self.chunk_indexes = random.sample(good_quality_indexes, k=50)
                 self.chunk_indexes.sort()
             else:
                 self.chunk_indexes = good_quality_indexes
@@ -754,7 +755,7 @@ class Sequence():
         self.batch_bandA, self.batch_bandB, self.chunk_temporal = self.read_and_correct_selected_indexes(indexes_to_read=self.chunk_indexes, correct=True, temporal=True)
 
 
-    def find_spectrometer_FOV(self, s=5, plot=True):
+    def find_spectrometer_FOV(self, s=3, plot=True):
         '''Assuming that absorbance images have been calculated and spectrometer data is
         read in, run a cross-correlation to estimate the pixel at which the spectrometer
         is centered.
@@ -762,11 +763,13 @@ class Sequence():
         Calculations are run for every s-th pixel (simply by selecting that pixel, no
         downsampling or averaging is used).'''
 
+        print("Calculating correlations with spectrometer data")
         #Create results array, with extra rows and columns to for ease of filling the downsampled results
         correlation_vis = np.empty((self.AA.shape[1] + s, self.AA.shape[2] + s))
 
         batch_spectra = [self.spectra[i] for i in self.chunk_indexes]
         for row in range(0, self.AA.shape[1], s):
+            print(row)
             for column in range(0, self.AA.shape[2], s):
                 absorbance_series = self.AA[:, row, column]
                 #Only proceed if no element of the absorbance series is masked out (i.e all absorbance values exist)
@@ -852,9 +855,9 @@ class Sequence():
         '''
         multiplier = 64.06/(6.02*10e22)
         self.CD = self.CD * multiplier
-        show(self.CD[-1,:,:], cmap="YlGnBu_r")
+        #show(self.CD[-1,:,:], cmap="YlGnBu_r")
 
-    def estimate_velocity_2D(self, i, method):
+    def estimate_velocity_2D(self, i, method, plot=False):
         '''Estimate the velocity of each pixel (in vertical and horizontal pixels) between the current and
         next frame, using the specified method.'''
         index_in_batch = self.chunk_indexes.index(i)
@@ -864,26 +867,40 @@ class Sequence():
         current_velocity_array = method(frame1, frame2)
         self.velos.append(current_velocity_array)
 
+        if plot == True:
+            plot_dense_flow(self.velos[-1], frame1, n=5)
+
     def set_cam_geom(self, CamGeomObject):
         '''Give the sequence access to the results of geometric calculations.'''
         self.cam_geom = CamGeomObject
 
-    def set_integration_circle(self, c, r):
-        IC = Circle(c, r, self.cam_geom.pixel_count, self.flank_mask, self.cam_geom)
-        IC.calculate_intersection_lengths(self.cam_geom)
+    def set_integration_circle(self, c, r, plot=False):
+        self.IC = Circle(c, r, self.cam_geom.pixel_count, self.flank_mask, self.cam_geom)
+        self.IC.calculate_intersection_lengths(self.cam_geom)
 
-    def calculate_flux(self, i):
+        if plot == True:
+            show(self.IC.intersection_lengths, title="Integration steps")
+
+    def calculate_flux(self, i, plot=False):
         '''Calculate flux based on the AA for the given image index,
         and the last calculated flow.'''
         index_in_batch = self.chunk_indexes.index(i)
         #Convert flow field into units of meters
-        flow_m = self.cam_geom.convert_velocity_to_ms(self.velos[-1])
-        kg_per_ts = self.IC.integrate1D(flow_m=flow_m, pixel_vals=self.batch_bandA[index_in_batch])
+        flow_m = self.cam_geom.convert_velocities_to_world_coords(self.velos[-1])
+        #plot_dense_flow(flow_m, self.batch_bandA[index_in_batch], n=10, world_coords=True)
+        self.IC.intersection_lengths = np.where(self.flank_mask == 0, 0, self.IC.intersection_lengths)
+        kg_per_ts = self.IC.integrate1D(flow_m=flow_m, pixel_vals=self.CD[index_in_batch])
         timestep_len = self.times[i + 1] - self.times[i]
         kg_per_s = kg_per_ts / timestep_len.seconds
         self.flux.append(kg_per_s)
         print("Flux: ")
         print(str(kg_per_s) + "kg/s")
+
+        if plot == True:
+            img_to_show = self.CD[index_in_batch]
+            img_to_show = np.where(self.IC.intersection_lengths > 0, np.max(img_to_show), img_to_show)
+            mask = np.where(self.IC.intersection_lengths > 0, 0, 1)
+            plot_dense_flow(self.IC.normals * 10, image=img_to_show, n=2, color_array=self.IC.contributions, world_coords=True, mask=mask)
 
 
 class CameraGeometry():
@@ -891,6 +908,7 @@ class CameraGeometry():
     def __init__(self, volcano_dictionary, camera_dictionary):
         '''Initialise the camera geometry variables, reading in the relevant information from the
         volcano dictionary.'''
+        print("Initialising camera geometry setup.")
 
         self.cam_lat = volcano_dictionary['cam_lat'] #Position of the camera
         self.cam_lon = volcano_dictionary['cam_lon']
@@ -935,8 +953,8 @@ class CameraGeometry():
         elif self.pixel_count[1] % 2 != 0:
             print("ERROR: Geometry calc assumes image dimensions are divisible by two.")
         # How many pixel steps from the CFOV is the reference point?
-        angular_steps_h = self.ref_pixel_coords[1] - (self.pixel_count[1]/2) - 0.5
-        angular_steps_v = self.ref_pixel_coords[0] - (self.pixel_count[0]/2) - 0.5
+        angular_steps_h = self.ref_pixel_coords[0] - (self.pixel_count[1]/2) - 0.5
+        angular_steps_v = self.ref_pixel_coords[1] - (self.pixel_count[0]/2) - 0.5
         self.cfov_azim = -1 * angular_steps_h * self.alpha_h + source_azim
         self.cfov_elev = angular_steps_v * self.alpha_v + source_elev
 
@@ -990,10 +1008,11 @@ class CameraGeometry():
         map2D = s.plot_2d()
         plt.show()
 
-        #map3D = s.plot_3d()
+        map3D = s.plot_3d()
+        plt.show()
 
     def map_img_coords_to_world_plane(self, coords_array):
-        '''Take in a 3D array of size height x width x 2 which holds Y and X
+        '''Take in a 3D array of size height x width x 2 which holds Y(index 0) and X(index 1)
         coordinates (in pixels) for hxw points.
         Calculate and return the Y and X coordinates of each point
         on the true-size image plane with axes centered at the CFOV.'''
@@ -1002,7 +1021,6 @@ class CameraGeometry():
 
         #Calculate the height of the CFOV (ignoring the height the altitude of the camera)
         h_cfov = self.cam_to_cfov.dist_hor * np.tan((self.cfov_elev/180) * np.pi)
-        print(h_cfov)
         #Check this matches the geonum point! - Yes :)
 
         #For each point calculate the height above or below the COFV
@@ -1038,8 +1056,8 @@ class CameraGeometry():
         coords_array = np.stack(arrays=[Y, X], axis=-1)
         world_coords_tl = self.map_img_coords_to_world_plane(coords_array)
         world_coords_br = self.map_img_coords_to_world_plane(coords_array + 1)
-        pixel_widths = world_coords_br[:,:,1] - world_coords_tl[:,:,1] * 1000
-        pixel_heights = world_coords_tl[:,:,0] - world_coords_br[:,:,0] * 1000
+        pixel_widths = (world_coords_br[:,:,1] - world_coords_tl[:,:,1]) * 1000
+        pixel_heights = (world_coords_tl[:,:,0] - world_coords_br[:,:,0]) * 1000
 
         if plot == True:
             show(pixel_widths, title="Pixel Widths (m)")
@@ -1051,10 +1069,30 @@ class CameraGeometry():
         print("Real-world image plane size (km): ")
         print(real_image_size)
 
-    def convert_velocity_to_ms(self, field):
+    def convert_velocities_to_world_coords(self, field):
         '''Assuming each vector's origin is at the center of the pixel,
         calculate the horizontal and vertical components in real-world
         size.'''
+
+        x_vals = np.arange(0, self.pixel_count[1])
+        y_vals = np.arange(0, self.pixel_count[0])
+        X, Y = np.meshgrid(x_vals, y_vals)
+        #Arrays which store the center coordinate of each pixel (indexed with [0,0] as top left corner)
+        origin_X = X + 0.5
+        origin_Y = Y + 0.5
+        #Arrays storing the calculated destination of each pixel, (in units of pixels)
+        dest_X = origin_X + field[:, :, 0]
+        dest_Y = origin_Y + field[:, :, 1]
+
+        #Convert both origins and destinations to real-world coords
+        real_world_origin_coords = self.map_img_coords_to_world_plane(np.stack(arrays=[origin_Y, origin_X], axis=-1))
+        real_world_dest_coords = self.map_img_coords_to_world_plane(np.stack(arrays=[dest_Y, dest_X], axis=-1))
+
+        #Calculate the real-world vector components
+        real_world_dx = (real_world_dest_coords[:,:,1] - real_world_origin_coords[:,:,1]) * 1000
+        real_world_dy = (real_world_dest_coords[:, :, 0] - real_world_origin_coords[:, :, 0]) * 1000
+        return np.stack([real_world_dx, real_world_dy], axis=-1)
+
 
 
 class IntegrationObject():
@@ -1074,8 +1112,8 @@ class IntegrationObject():
         dot = np.multiply(self.normals[:,:,0], flow_m[:, :, 0]) + np.multiply(self.normals[:,:,1], flow_m[:, :, 1])
 
         #Multiply the contribution from each pixel by the arc length at that pixel
-        contributions = np.multiply(self.intersections, np.multiply(pixel_vals, dot))
-        flux_1D = np.sum(contributions)
+        self.contributions = np.multiply(self.intersection_lengths, np.multiply(pixel_vals, dot))
+        flux_1D = np.sum(self.contributions)
         return flux_1D
 
 class Line(IntegrationObject):
@@ -1085,13 +1123,13 @@ class Line(IntegrationObject):
 
 class Circle(IntegrationObject):
     def __init__(self, c, r, img_shape, flank_mask, CamGeomObject):
-        '''c=(along, down)'''
+        '''c=(down, along)'''
         self.c = c
         self.r = r
 
         #Calculate which points lie on the circle
         self.points = calculate_circle_points(img_shape, c, r)
-        show(self.points)
+        #show(self.points)
 
         #Use the flank mask to remove overlap
         self.points = np.where(flank_mask == 0, 0, self.points)
@@ -1106,19 +1144,20 @@ class Circle(IntegrationObject):
         #Adding 0.5 below to convert to coord system used for Camera Geometry class
         world_coords_pixel_centers = CamGeomObject.map_img_coords_to_world_plane(coords_array + 0.5)
         world_coords_pixel_centers = world_coords_pixel_centers * 1000 #Conversion to m from km
-
-        center_coord = world_coords_pixel_centers[c[1], c[0], :]
-        n_x = world_coords_pixel_centers[:,:,1] - (center_coord[0] + 0.5)
-        n_y = world_coords_pixel_centers[:,:,0] - (center_coord[1] + 0.5)
+        #show(world_coords_pixel_centers[:,:,0])
+        #show(world_coords_pixel_centers[:,:,1])
+        center_coord = world_coords_pixel_centers[c[0], c[1], :]
+        n_x = world_coords_pixel_centers[:,:,1] - center_coord[1]
+        n_y = world_coords_pixel_centers[:,:,0] - center_coord[0]
         n_m = np.sqrt(np.square(n_x) + np.square(n_y))
         n_x = np.divide(n_x, n_m)
         n_y = np.divide(n_y, n_m)
         # Set the normal at the center point equal to zero rather than invalid value
-        n_x[c[1], c[0]] = 0
-        n_y[c[1], c[0]] = 0
+        n_x[c[0], c[1]] = 0
+        n_y[c[0], c[1]] = 0
         self.normals = np.stack([n_x, n_y], axis=-1)
-        show(n_x)
-        show(n_y)
+        #show(n_x)
+        #show(n_y)
 
     def calculate_intersection_lengths(self, CamGeomObject):
         '''Calculate the length of true circle intersecting with each pixel,
@@ -1142,7 +1181,7 @@ class Circle(IntegrationObject):
         #Calculate distances
         sum = np.square(first_IP_m[:,:,0] - second_IP_m[:,:,0]) + np.square(first_IP_m[:,:,1] - second_IP_m[:,:,1])
         self.intersection_lengths = np.sqrt(sum) * 1000
-        show(self.intersection_lengths, title="Intersection Lengths (m)")
+        #show(self.intersection_lengths, title="Intersection Lengths (m)")
 
 
 
