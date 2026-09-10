@@ -692,7 +692,7 @@ class Sequence():
                     self.indexes_of_stored_AAs.append(ni)
                 else:
                     location = bisect.bisect_left(self.indexes_of_stored_AAs, ni)  # index at which to insert the new data
-                    np.insert(self.AA, location, new_AA, axis=0)
+                    self.AA = np.insert(self.AA, location, new_AA, axis=0)
                     self.indexes_of_stored_AAs.insert(location, ni)
 
                 new_items_added += 1
@@ -820,8 +820,17 @@ class Sequence():
         Starting with a simple linear fit: column_density = m * absorbance + c
         '''
 
-        absorbance_inputs = self.AA[:,int(self.spec_CFOV[0]), int(self.spec_CFOV[1])]
+        absorbance_inputs = self.AA[:,int(self.spec_CFOV[0]), int(self.spec_CFOV[1])].copy()
         spectra_target = self.spectra[self.chunk_indexes[0]:self.chunk_indexes[-1] + 1]
+
+        #TODO Drop any indexes for which spectra is nan:
+        spectra_target = np.ma.masked_where(np.isnan(spectra_target), spectra_target)
+        absorbance_inputs.mask = spectra_target.mask
+        spectra_target = spectra_target.compressed()
+        absorbance_inputs = absorbance_inputs.compressed()
+
+
+
         coeffs = np.polyfit(x=absorbance_inputs, y=spectra_target, deg=1)
         line_fn = np.poly1d(coeffs)
         self.calib_fn = line_fn
@@ -861,8 +870,8 @@ class Sequence():
         '''Estimate the velocity of each pixel (in vertical and horizontal pixels) between the current and
         next frame, using the specified method.'''
         index_in_batch = self.chunk_indexes.index(i)
-        frame1 = self.batch_bandA[i]
-        frame2 = self.batch_bandA[i + 1]
+        frame1 = self.batch_bandA[index_in_batch]
+        frame2 = self.batch_bandA[index_in_batch + 1]
 
         current_velocity_array = method(frame1, frame2)
         self.velos.append(current_velocity_array)
@@ -1008,8 +1017,8 @@ class CameraGeometry():
         map2D = s.plot_2d()
         plt.show()
 
-        map3D = s.plot_3d()
-        plt.show()
+        #map3D = s.plot_3d() #TODO This is currently showing a blank figure for some reason
+        #plt.show()
 
     def map_img_coords_to_world_plane(self, coords_array):
         '''Take in a 3D array of size height x width x 2 which holds Y(index 0) and X(index 1)

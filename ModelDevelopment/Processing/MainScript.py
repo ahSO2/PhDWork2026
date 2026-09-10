@@ -19,7 +19,7 @@ Reventador_2022_dictionary = {"volcano_dictionary_name":"Reventador2022",
                               'flank_mask_path': "C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/Reventador2022FlankMask.png",
                               'cam_lat': -0.073421,
                               'cam_lon': -77.617984,
-                              'cam_height': None,
+                              'cam_height': 1.75, #Camera height in m (typically 1-1.5m but varies between camera installation)
                               'ref_lat':-0.0804836, #Coordinates of a reference point in the image used to find the camera angle (here I use the edge of the crater)
                               'ref_lon':-77.6571622,
                               'ref_pixel_coords':(167, 355),#TODO Maybe select a bit more precisely
@@ -35,21 +35,21 @@ geom_data = {'plume_dir_azim': None #TODO currently not used in my code #Directi
 background_method = constant_ratio_assumption
 velocity_method = ones
 #spectrometer_CFOV = None
-spectrometer_CFOV = (55, 305) #Result of running correlation
+spectrometer_CFOV = (224, 307) #Result of running correlation on Seq1 data
 
 ######################## Processing ########################################
 reventador_sequence = Sequence()
 reventador_sequence.img_shape = camera_dictionary['res']
 reventador_sequence.set_volcano_dictionary(Reventador_2022_dictionary)
-reventador_sequence.initialise_and_match_full_sequence("E:/Reventador/2022/2022-04-24/Seq_2")
+reventador_sequence.initialise_and_match_full_sequence("E:/Reventador/2022/2022-04-24/Seq_1")
 
 cam_geom = CameraGeometry(Reventador_2022_dictionary, camera_dictionary)
 cam_geom.calculate_camera_angle()
 cam_geom.calculate_CFOV_location()
 cam_geom.plot_camera_geometry()
-cam_geom.calculate_pixel_sizes(plot=True)
+cam_geom.calculate_pixel_sizes(plot=False)
 reventador_sequence.set_cam_geom(cam_geom)
-reventador_sequence.set_integration_circle(c=(330, 171), r=100, plot=True)
+reventador_sequence.set_integration_circle(c=(330, 171), r=100, plot=False)
 
 #Apply quality models for the whole sequence, and save the predictions to two arrays.
 #This is run by loading batches of images at a time, to avoid overwhelming the memory.
@@ -58,13 +58,13 @@ reventador_sequence.match_timestep_images()
 #reventador_sequence.apply_quality_models(chunk_size=20)
 
 #Identify the spectrometer FOV, based on selected good quality images
-reventador_sequence.read_spectrometer_data("E:/Reventador/2022/2022-04-24/Seq_2/Processed_spec_2026-08-19T160055/doas_results_2022-04-24T170000.csv")
+reventador_sequence.read_spectrometer_data("E:/Reventador/2022/2022-04-24/Seq_1/Processed_spec_2026-09-10T141341/doas_results_2022-04-24T140025.csv")
 if spectrometer_CFOV == None:
-    reventador_sequence.select_and_read_indexes_for_spectrometer_FOV_match(indexes=[8, 17, 18, 25, 26, 32, 33, 38, 48, 50, 51, 55, 59, 67, 69, 71, 72, 77, 88, 96, 98, 109, 111, 113, 117, 133, 136, 147, 148, 150, 151, 152, 154, 156, 157, 159, 170, 171, 185, 186, 187, 188, 190, 192, 198, 205, 216, 226, 232, 234, 236, 246, 248, 250, 251, 254, 258, 259, 273, 276, 290, 292, 310, 313, 315, 316, 317, 346, 349, 365, 369, 370, 375, 378, 385, 388, 392, 396, 407, 408, 410, 414, 415, 425, 430, 436, 438, 446, 448, 449, 456, 458, 465, 467, 468, 471, 472, 473, 474, 476])
+    reventador_sequence.select_and_read_indexes_for_spectrometer_FOV_match(indexes=np.arange(74, 247).tolist()) #Indexes of a period in Rev2022-04-24 Seq1 with lofting plume
     #reventador_sequence.select_and_read_indexes_for_spectrometer_FOV_match(indexes=[8, 17, 18, 25])
     reventador_sequence.estimate_backgrounds(method=background_method)
     reventador_sequence.calculate_absorbance(correction=zero_flank)
-    reventador_sequence.find_spectrometer_FOV(s=5, plot=True)
+    reventador_sequence.find_spectrometer_FOV(s=1, plot=True)
 else: #Or set a known spectrometer FOV:
     reventador_sequence.spec_CFOV = spectrometer_CFOV
 
@@ -73,7 +73,7 @@ else: #Or set a known spectrometer FOV:
 #the surrounding samples needed for the calibration for that image
 for i in range(0, len(reventador_sequence.bandA_names)):
     print("Processing image: " + str(i) )
-    reventador_sequence.iterate(b=i, method="basic", mins=4)
+    reventador_sequence.iterate(b=i, method="basic", mins=6)
     #reventador_sequence.view_current_chunk(band="B", timesteps=[-10, 10])
     #Update the backgrounds, and calculate the absorbance for the new chunk (copying over any that were already calculated in the previous)
     reventador_sequence.estimate_backgrounds(method=background_method)
@@ -84,7 +84,7 @@ for i in range(0, len(reventador_sequence.bandA_names)):
     reventador_sequence.estimate_velocity_2D(i=i, method=ones, plot=True)
     reventador_sequence.calculate_flux(i=i, plot=True)
 
-    if i in range(1, len(reventador_sequence.bandA_names)-1):
+    if i in range(10, len(reventador_sequence.bandA_names)-1):
         index_in_chunk = reventador_sequence.chunk_indexes.index(i)
         for chunk_i in [index_in_chunk]:
             img_A = reventador_sequence.batch_bandA[chunk_i]
@@ -100,6 +100,9 @@ for i in range(0, len(reventador_sequence.bandA_names)):
             axs[1, 0].imshow(bg_A, cmap="gray")
             axs[1, 1].imshow(bg_B, cmap="gray")
             plt.show()
+
+
+
 
 
 
