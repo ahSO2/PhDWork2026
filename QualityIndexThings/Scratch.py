@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
 
-3D_seq = np.array([[1, 2],
-                    [3, np.nan]])
-print(np.nanargmax(array1))
+array = np.array([[1, 2],
+                    [3, 3]])
+print(np.nanargmax(array))
