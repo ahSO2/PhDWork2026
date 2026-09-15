@@ -1,7 +1,16 @@
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import pyplis
+from skimage.filters.rank import entropy
+from skimage.morphology import disk
 
+def min_max_scale(img):
+    '''Scale image to range [0, 1].'''
+    img_min = np.min(img)
+    img_max = np.max(img)
+    scaled_img = (img - img_min)/(img_max-img_min)
+    return scaled_img
 def delledonne_max_bandA(bandA, bandB, volcano_dictionary, plot=False):
     '''Select the maximum pixel value in the band A image within a rectangular
     region at the top of the image. Select a small circular region around this
@@ -107,21 +116,103 @@ def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
     '''Threshold on the ratio of bandA/bandB, then select largest connected component
     of pixels to represent the plume.'''
 
-    #TODO Calculate bandA/bandB
+    #Calculate bandA/bandB, masking out edges where bandB is zero or has
+    #weird values introduced by the registration transformation
+    bandA_copy = np.ma.masked_where(bandB == 0, bandA.copy())
+    ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
+    ratio = np.ma.masked_where(bandA_copy.mask, bandA_copy)
+
+    #TODO Here I have applied smoothing to avoid getting lots of small
+    #connected areas - not sure if this is applied in the original paper?
+    ratio = cv2.blur(ratio, (5, 5))
+    bandB_zero = np.where(bandB == 0, 3, 0)
+    edge_mask = cv2.blur(bandB_zero, (11, 11))
+    edge_mask[:, 0] = 1
+    edge_mask[:, -1] = 1
+    edge_mask[0, :] = 1
+    edge_mask[-1, :] = 1
+    ratio = np.ma.masked_where(edge_mask > 0, ratio)
+    plt.imshow(ratio, cmap="YlGnBu_r")
+    plt.colorbar()
+    plt.show()
+
 
     #TODO Threshold this ratio (how to set value?)
+    threshold = np.mean(bandA) #TODO Dummy choice for now
+    binary = np.where(ratio > threshold, 1, 0).astype(np.uint8)
+    plt.imshow(binary, cmap='gray')
+    plt.show()
 
     #TODO Select pixels with 8-connectivity
+    n_labels, labels_im = cv2.connectedComponents(binary)
+    print(n_labels)
+    plt.imshow(labels_im)
+    plt.colorbar()
+    plt.show()
 
     #TODO Select largest connected component as the plume
     #TODO Everything else is reference area
+    return None
 
 def kern_low_texture_and_ratio(bandA, bandB, volcano_dictionary, plot=False):
     '''Filter for an area of the image which is "smooth" and has
     a low -ln(bandA/bandB) value.'''
 
-    #TODO Maybe calculate image entropy
+    #Calculate the absorbance ignoring backgrounds
+    #First mask out the edges which cause artifical high absorbance values
+    bandA_copy = bandA.copy()
+    bandA_copy = np.ma.masked_where(bandB == 0, bandA_copy)
+
+    #Then calculate the absorbance (without accounting for backgrounds)
+    ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
+    ratio = -1 * np.ma.log(ratio)
+
+    #Measure smoothness - here I have chosen to use entropy
+    scaled_ratio = min_max_scale(ratio)
+    e_img = entropy(scaled_ratio, disk(10))
+    e_img = np.ma.masked_where(ratio.mask, e_img)
+    plt.imshow(e_img)
+    plt.colorbar()
+    plt.show()
 
     #TODO Then select a point with relatively low entropy and low optical depth
 
+    return None
 
+def pyplis_rectangles_and_lines(bandA, bandB, volcano_dictionary, plot=True, output="both"):
+    '''Based on the image intensity, select three reference rectangles and
+    two reference lines, and return as two separate masks.'''
+    ref_params = pyplis.plumebackground.find_sky_reference_areas(bandA)
+
+    if plot == True:
+        fig, axs = plt.subplots()
+        pyplis.plumebackground.plot_sky_reference_areas(bandA, ref_params, ax=axs)
+        plt.show()
+
+    lines_mask = np.zeros_like(bandA)
+    lines_mask[ref_params['xgrad_line_rownum'], ref_params['xgrad_line_startcol']:ref_params['xgrad_line_stopcol']] = 1
+    lines_mask[ref_params['ygrad_line_startrow']:ref_params['ygrad_line_stoprow'], ref_params['ygrad_line_colnum']] = 1
+
+    rectangles_mask = np.zeros_like(bandA)
+    rectangles_mask[ref_params['scale_rect'][1]:ref_params['scale_rect'][3], ref_params['scale_rect'][0]:ref_params['scale_rect'][2]] = 1
+    rectangles_mask[ref_params['xgrad_rect'][1]:ref_params['xgrad_rect'][3],ref_params['xgrad_rect'][0]:ref_params['xgrad_rect'][2]] = 1
+    rectangles_mask[ref_params['ygrad_rect'][1]:ref_params['ygrad_rect'][3],ref_params['ygrad_rect'][0]:ref_params['ygrad_rect'][2]] = 1
+
+    if output == "lines":
+        return lines_mask
+    elif output == "rectangles":
+        return rectangles_mask
+    else:
+        return np.where(lines_mask + rectangles_mask > 0, 1, 0)
+def pyplis_background_mask(bandA, bandB, volcano_dictionary, plot, next_img):
+    '''Determine background pixels by thresholding on bandA intensity (threshold based
+        on the reference areas) and then exclusion of pixels which are moving (based on motion est alg).'''
+    bandA_obj = pyplis.image.Img(bandA[:-2, :])
+    next_img_obj = pyplis.image.Img(next_img[:-2, :])
+    bg_pixels = pyplis.plumebackground.find_sky_background(bandA_obj, next_img_obj, bgmodel_settings_dict=None,lower_thresh=None, apply_movement_search=True)
+    #TODO Note I've removed the bottom two rows of each image because I think the fact that the
+    #heights were not divisible by 4 was causing an mismatch in the dimension of the movement
+    #mask returned (which is calulated using pyramids which I think downsample in multiples of 4)
+    #I replace these rows with zeros, as the flank is masked out anyway
+    bg_pixels = np.concatenate([bg_pixels, np.zeros((2, bg_pixels.shape[1]))], axis=0)
+    return bg_pixels

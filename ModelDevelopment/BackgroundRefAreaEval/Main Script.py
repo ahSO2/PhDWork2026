@@ -56,9 +56,10 @@ for llo in locations: #Leaving out one location at a time
             axs[1,2].imshow(flank_mask, cmap="gray")
             plt.show()
 
-        ref_areas = delledonne_min_ratio(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        plt.imshow(ref_areas, cmap="gray")
-        plt.show()
+        ref_areas = osorio_threshold_and_connect(sequence[0], sequence_B[0], volc_dictionary, plot=True)
+
+        #plt.imshow(ref_areas, cmap="gray")
+        #plt.show()
 
 
 
