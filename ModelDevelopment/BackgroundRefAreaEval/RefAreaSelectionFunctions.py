@@ -4,6 +4,8 @@ import numpy as np
 import pyplis
 from skimage.filters.rank import entropy
 from skimage.morphology import disk
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn import linear_model
 
 def min_max_scale(img):
     '''Scale image to range [0, 1].'''
@@ -11,6 +13,28 @@ def min_max_scale(img):
     img_max = np.max(img)
     scaled_img = (img - img_min)/(img_max-img_min)
     return scaled_img
+
+def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
+    '''A function to allow easy implementation of thresholding on channels
+    commonly used in literature either manually or with Otsu's method.
+    
+    Channel options: bandA, difference between consecutive frames, difference taken
+    with a reference image, ratio of bandA to B, or log ratio.'''
+
+    channel = bandA
+
+    threshold = 300
+
+    ref_areas = np.where(channel > threshold, 1, 0)
+
+    img_to_show = np.where(ref_areas == 1, bandA, 0)
+    plt.imshow(img_to_show, cmap="gray")
+    plt.colorbar()
+    plt.show()
+
+    return ref_areas
+
+
 def delledonne_max_bandA(bandA, bandB, volcano_dictionary, plot=False):
     '''Select the maximum pixel value in the band A image within a rectangular
     region at the top of the image. Select a small circular region around this
@@ -216,3 +240,78 @@ def pyplis_background_mask(bandA, bandB, volcano_dictionary, plot, next_img):
     #I replace these rows with zeros, as the flank is masked out anyway
     bg_pixels = np.concatenate([bg_pixels, np.zeros((2, bg_pixels.shape[1]))], axis=0)
     return bg_pixels
+
+def polynomial_fit(masked_image, degree=2, plot=False):
+    '''Fit a 2D polynomial to the unmasked pixels of the given image,
+    and return the value of the fitted polynomial for every pixel.'''
+    #An object which maps an array of x,y coords to [intercept, x, y, xy, x^2, y^2 ...] dependent on specified degree
+    poly_features_map = PolynomialFeatures(degree=degree)
+
+    #Create a (n_pixels x 2) array of the x and y coords of each unmasked point in the image
+    x_range = np.arange(0, masked_image.shape[1])
+    y_range = np.arange(0, masked_image.shape[0])
+    X, Y = np.meshgrid(x_range, y_range)
+
+    masked_X = np.ma.masked_where(masked_image.mask, X)
+    masked_Y = np.ma.masked_where(masked_image.mask, Y)
+    unmasked_coords = np.stack([masked_X.compressed(), masked_Y.compressed()], axis=1)
+    #Transform the coordinates of the unmasked points to the polynomial multiples required to input into the linear fit
+    polynomial_inputs = poly_features_map.fit_transform(unmasked_coords)
+
+    #Create an array holding coordinates of all points in the image, and map to the required polynomial imput values
+    all_img_coords = np.stack([X.flatten(), Y.flatten()], axis=-1)
+    all_img_coords_polynomial = poly_features_map.fit_transform(all_img_coords)
+
+    regression_model = linear_model.LinearRegression()
+
+    regression_model.fit(polynomial_inputs, masked_image.compressed())
+
+    fitted_image = regression_model.predict(all_img_coords_polynomial)
+
+    #Now map back to the original image dimension
+    fitted_image = fitted_image.reshape((masked_image.shape[0], masked_image.shape[1]))
+
+    if plot == True:
+        fig, axs = plt.subplots(ncols=2)
+        left = axs[0].imshow(masked_image, cmap="gray")
+        axs[0].set_title("Original")
+        right = axs[1].imshow(fitted_image, cmap="gray", vmin=np.ma.min(masked_image), vmax=np.ma.max(masked_image))
+        axs[1].set_title("Fitted Estimate")
+        fig.colorbar(right, ax=axs[0:2], location="right", shrink=0.7, pad=0.15)
+        plt.show()
+
+    return fitted_image
+
+
+def smekens_repeated_fitting(bandA, flank_mask):
+    '''Identify sky reference areas by repeatedly fitting a 2D polynomial to the
+    sky pixels, and excluding any pixels which are not well represented. '''
+
+    sky_mask = flank_mask.copy() #Mask indicating pixels thought to be clear sky with 1s
+
+    #TODO I have omitted the edge mask used by Smekens et al. because we have
+    #clear-corrected the images (and I think the design of the camera minimises
+    #the effects at the egdes anyway).
+    repeat = True
+    while repeat == True:
+        #Fit a 2D polynomial to the sky pixels
+        masked_bandA = np.ma.masked_where(sky_mask==0, bandA)
+        #TODO What degree of polynomial should be used?
+        polyfit_sky = polynomial_fit(masked_bandA, degree=3, plot=False)
+        #Calculate the transmittance image
+        transmittance = np.ma.divide(masked_bandA, polyfit_sky)
+
+        #Exclude pixels with transmittance outwith (0.97, 1.03) from the
+        #identified sky reference area mask
+        prev_sky_mask = sky_mask.copy()
+        sky_mask = np.where(transmittance >= 1.03, 0, sky_mask)
+        sky_mask = np.where(transmittance <= 0.97, 0, sky_mask)
+
+        if np.array_equal(sky_mask, prev_sky_mask): #If the sky mask hasn't changed (i.e all pixels are approximated within 3%)
+            repeat = False
+            plt.imshow(sky_mask)
+            plt.title("Final sky ref areas")
+            plt.show()
+
+    return sky_mask
+

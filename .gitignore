@@ -210,3 +210,5 @@ QualityIndexThings/Inter-LabellerAgreement/ManualLabels/KDAplha/CSVFilesToUpload
 QualityIndexThings/Inter-LabellerAgreement/ManualLabels/KDAplha/CSVFilesToUpload/precipitation_binary_labels_ReventadorOnly.csv
 
 QualityIndexThings/CalculatingMetrics/EvaluatingOnFullDays/FullDays_StdThreshold_OverallObsPredictions.csv
+
+ModelDevelopment/BackgroundRefAreaEval/__pycache__/
