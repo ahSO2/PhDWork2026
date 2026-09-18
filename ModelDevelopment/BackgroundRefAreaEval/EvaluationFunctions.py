@@ -1,5 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+
+
 def calculate_conf_counts(predicted_mask, true_mask):
     '''The positive (clear-sky) pixels in each mask should be indicated by 1s.'''
 
@@ -68,6 +71,53 @@ def F1_score(P, R):
 
     return F1
 
+def mean_with_95p_bootstrap(array, rng):
+    '''Intakes and passes back a random number generator object (which can be initialised
+    outwith this function with a seed). '''
+    mean = np.nanmean(array)
+
+    bootstrap_means = []
+
+    # Bootstrap CI
+    for b in range(0, 1000):
+        selection = rng.choice(array, array.shape[0], replace=True)
+        bootstrap_means.append(np.mean(selection))
+
+    lower = np.percentile(bootstrap_means, q=2.5)
+    upper = np.percentile(bootstrap_means, q=97.5)
+    return np.round(mean, 4), np.round(lower, 4), np.round(upper, 4), rng
+
+def location_balanced_mean(array, locations):
+
+    values_df = pd.DataFrame()
+    values_df["value"] = array
+    values_df["location"] = locations
+
+    location_means = []
+    for location in set(locations):
+        location_samples = values_df[values_df["location"] == location]
+        location_means.append(np.nanmean(location_samples["value"]))
+    return np.mean(location_means)
+
+
+def location_balanced_mean_with_95p_bootstrap(values, locations, rng):
+
+    balanced_mean = location_balanced_mean(values, locations)
+
+    bootstrap_balanced_means = []
+
+    values_df = pd.DataFrame()
+    values_df["value"] = values
+    values_df["location"] = locations
+
+    # Bootstrap CI
+    for b in range(0, 1000):
+        sample = values_df.sample(n=values_df.shape[0], replace=True, random_state=rng)
+        bootstrap_balanced_means.append(location_balanced_mean(sample["value"], sample["location"]))
+    lower = np.percentile(bootstrap_balanced_means, q=2.5)
+    upper = np.percentile(bootstrap_balanced_means, q=97.5)
+
+    return np.round(balanced_mean, 4), np.round(lower, 4), np.round(upper, 4), rng
 
 
 

@@ -35,7 +35,7 @@ def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
     return ref_areas
 
 
-def delledonne_max_bandA(bandA, bandB, volcano_dictionary, plot=False):
+def delledonne_max_bandA(bandA, plot=False):
     '''Select the maximum pixel value in the band A image within a rectangular
     region at the top of the image. Select a small circular region around this
     point from which to take the average band A value. '''
@@ -59,7 +59,7 @@ def delledonne_max_bandA(bandA, bandB, volcano_dictionary, plot=False):
 
     if plot == True:
         bandA_copy = bandA.copy()
-        img_to_show = cv2.rectangle(bandA_copy, (tl[1], tl[0]), (br[1], br[0]), color=np.min(bandA_copy))
+        img_to_show = cv2.rectangle(bandA_copy, (tl[1], tl[0]), (br[1], br[0]), color=int(np.min(bandA_copy)))
         # region_to_show = cv2.circle(sky_region, center=(column_in_region, row_in_region), radius=circle_radius, color=int(np.min(sky_region)))
         img_to_show = np.where(circle_mask == 1, circle_mean_value, img_to_show)
         img_to_show = cv2.circle(img_to_show, center=(max_index[1], max_index[0]), radius=circle_radius, color=int(np.min(bandA)))
@@ -67,9 +67,9 @@ def delledonne_max_bandA(bandA, bandB, volcano_dictionary, plot=False):
         plt.show()
 
 
-    return circle_mask #Return the selected circle as the reference area
+    return circle_mask, "D-A" #Return the selected circle as the reference area
 
-def delledonne_min_ratio(bandA, bandB, volcano_dictionary, plot=False):
+def delledonne_min_ratio(bandA, bandB, plot=False):
     '''Select the minimum of -ln(bandA/bandB) value within a rectangular
         region at the top of the image. Select a small circular region around this
         point from which to take the average ratio value.
@@ -134,7 +134,7 @@ def delledonne_min_ratio(bandA, bandB, volcano_dictionary, plot=False):
         plt.imshow(img_to_show, cmap="YlGnBu_r", vmin=np.ma.min(ratio), vmax=np.ma.max(ratio))
         plt.colorbar()
         plt.show()
-    return circle_mask
+    return circle_mask, "D-R"
 
 def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
     '''Threshold on the ratio of bandA/bandB, then select largest connected component
@@ -203,7 +203,7 @@ def kern_low_texture_and_ratio(bandA, bandB, volcano_dictionary, plot=False):
 
     return None
 
-def pyplis_rectangles_and_lines(bandA, bandB, volcano_dictionary, plot=True, output="both"):
+def pyplis_rectangles_and_lines(bandA, plot=True, output="both"):
     '''Based on the image intensity, select three reference rectangles and
     two reference lines, and return as two separate masks.'''
     ref_params = pyplis.plumebackground.find_sky_reference_areas(bandA)
@@ -223,12 +223,12 @@ def pyplis_rectangles_and_lines(bandA, bandB, volcano_dictionary, plot=True, out
     rectangles_mask[ref_params['ygrad_rect'][1]:ref_params['ygrad_rect'][3],ref_params['ygrad_rect'][0]:ref_params['ygrad_rect'][2]] = 1
 
     if output == "lines":
-        return lines_mask
+        return lines_mask, "G-L"
     elif output == "rectangles":
-        return rectangles_mask
+        return rectangles_mask, "G-R"
     else:
-        return np.where(lines_mask + rectangles_mask > 0, 1, 0)
-def pyplis_background_mask(bandA, bandB, volcano_dictionary, plot, next_img):
+        return np.where(lines_mask + rectangles_mask > 0, 1, 0), "G-RL"
+def pyplis_background_mask(bandA, next_img, plot=True):
     '''Determine background pixels by thresholding on bandA intensity (threshold based
         on the reference areas) and then exclusion of pixels which are moving (based on motion est alg).'''
     bandA_obj = pyplis.image.Img(bandA[:-2, :])
@@ -239,7 +239,13 @@ def pyplis_background_mask(bandA, bandB, volcano_dictionary, plot, next_img):
     #mask returned (which is calulated using pyramids which I think downsample in multiples of 4)
     #I replace these rows with zeros, as the flank is masked out anyway
     bg_pixels = np.concatenate([bg_pixels, np.zeros((2, bg_pixels.shape[1]))], axis=0)
-    return bg_pixels
+
+    if plot == True:
+        fig, axs = plt.subplots(ncols=2)
+        axs[0].imshow(bandA, cmap="gray")
+        axs[1].imshow(np.where(bg_pixels==1, bandA, np.min(bandA)), cmap="gray")
+        plt.show()
+    return bg_pixels, "G-AT"
 
 def polynomial_fit(masked_image, degree=2, plot=False):
     '''Fit a 2D polynomial to the unmasked pixels of the given image,
@@ -284,20 +290,20 @@ def polynomial_fit(masked_image, degree=2, plot=False):
 
 
 def smekens_repeated_fitting(bandA, flank_mask):
-    '''Identify sky reference areas by repeatedly fitting a 2D polynomial to the
+    '''Identify sky reference areas by repeatedly fitting a 2nd degree 2D polynomial to the
     sky pixels, and excluding any pixels which are not well represented. '''
 
     sky_mask = flank_mask.copy() #Mask indicating pixels thought to be clear sky with 1s
 
-    #TODO I have omitted the edge mask used by Smekens et al. because we have
-    #clear-corrected the images (and I think the design of the camera minimises
-    #the effects at the egdes anyway).
+    #I have omitted the edge mask used by Smekens et al. because we have
+    #clear-corrected the images (and I think the placement of the lens/filter
+    # in the PiCam camera minimises the effects at the edges).
+
     repeat = True
     while repeat == True:
         #Fit a 2D polynomial to the sky pixels
         masked_bandA = np.ma.masked_where(sky_mask==0, bandA)
-        #TODO What degree of polynomial should be used?
-        polyfit_sky = polynomial_fit(masked_bandA, degree=3, plot=False)
+        polyfit_sky = polynomial_fit(masked_bandA, degree=2, plot=False)
         #Calculate the transmittance image
         transmittance = np.ma.divide(masked_bandA, polyfit_sky)
 
