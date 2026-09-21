@@ -2,6 +2,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pyplis
+import scipy
 from skimage.filters.rank import entropy
 from skimage.morphology import disk
 from sklearn.preprocessing import PolynomialFeatures
@@ -13,6 +14,25 @@ def min_max_scale(img):
     img_max = np.max(img)
     scaled_img = (img - img_min)/(img_max-img_min)
     return scaled_img
+def calc_bin_thresh(image, plot=False):
+    '''Return a threshold for the image pixels based on the histogram bin
+    containing the most common values.'''
+
+    n_bins = 10
+    counts, bins = np.histogram(image.compressed(), n_bins, [np.nanmin(image), np.nanmax(image)])
+    bin_length = np.abs(np.nanmax(image) - np.nanmin(image)) / n_bins
+
+    max_bin_index = np.argmax(counts) #Index of tallest bin (starting from 0)
+    rhs_boundary = bins[max_bin_index + 1] - bin_length/2
+
+    if plot == True:
+        bin_centers = np.linspace(bin_length / 2, bin_length * (n_bins - 1 + 0.5), n_bins)
+        plt.stairs(counts, bins)
+        plt.scatter(bin_centers, np.ones_like(bin_centers))
+        plt.axvline(x=rhs_boundary)
+        plt.show()
+
+    return rhs_boundary
 
 def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
     '''A function to allow easy implementation of thresholding on channels
@@ -178,30 +198,106 @@ def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
     #TODO Everything else is reference area
     return None
 
-def kern_low_texture_and_ratio(bandA, bandB, volcano_dictionary, plot=False):
-    '''Filter for an area of the image which is "smooth" and has
-    a low -ln(bandA/bandB) value.'''
+def kern_low_texture_and_ratio(bandA, bandB, flank_mask, plot=False):
+    '''Filter for an area of the image which is smooth (low variance) and has
+    a low -ln(bandA/bandB) value.
+
+    The division into boxes used here is based on the assumption that the pixel
+    dimensions are such that that np.floor(dim/10) is divisible by 4.'''
 
     #Calculate the absorbance ignoring backgrounds
-    #First mask out the edges which cause artifical high absorbance values
+    #First mask out the edges which cause artifical high absorbance values,
+    #Masking out the flank at the same time
     bandA_copy = bandA.copy()
-    bandA_copy = np.ma.masked_where(bandB == 0, bandA_copy)
+    edge_mask = np.where(bandB==0, 0, flank_mask) * 5
+    edge_mask = cv2.blur(edge_mask, (5, 5))
+    edge_mask[:,0] = 0
+    edge_mask[:,-1] = 0
+    edge_mask[0,:] = 0
+    edge_mask[-1,:] = 0
+    bandA_copy = np.ma.masked_where(edge_mask < 5, bandA_copy)
 
     #Then calculate the absorbance (without accounting for backgrounds)
     ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
     ratio = -1 * np.ma.log(ratio)
 
-    #Measure smoothness - here I have chosen to use entropy
-    scaled_ratio = min_max_scale(ratio)
-    e_img = entropy(scaled_ratio, disk(10))
-    e_img = np.ma.masked_where(ratio.mask, e_img)
-    plt.imshow(e_img)
+    #Define the length of each box (10% of the image height and width)
+    l_h = int(np.floor(bandA.shape[1]/10))
+    l_v = int(np.floor(bandA.shape[0]/10))
+
+    means = np.empty(shape=(37,37))
+    vars = np.empty(shape=(37,37))
+    for i in range(0, 37): #Horizontal
+        for j in range(0, 37): #Vertical
+            s_h = int(i * (l_h/4)) #Horizontal index of the start of the box
+            s_v = int(j * (l_v/4)) #Vertical index of the start of the box
+            box = ratio[s_v:s_v + l_v, s_h:s_h + l_h]
+            mask = ratio.mask[s_v:s_v + l_v, s_h:s_h + l_h]
+            box = np.ma.masked_where(mask, box)
+
+            if np.array_equal(mask, np.ones_like(mask)):
+                box_mean = np.nan
+                var = np.nan
+            else:
+                box_mean = np.ma.mean(box)
+                unmasked_pixels = box.compressed()
+                var = np.var(unmasked_pixels)
+
+            means[j, i] = box_mean
+            vars[j, i] = var
+
+    #Select threshold on variance:
+    vars = np.ma.masked_invalid(vars)
+    thresh = calc_bin_thresh(vars, plot=True)
+
+    thresh_vars = np.ma.where(vars < thresh, vars, np.nan)
+    means_thresh = np.ma.where(vars < thresh, means, np.nan)
+
+    #Select the remaining rectangle with the lowest mean absorbance
+    min_index = np.nanargmin(means_thresh)
+    min_x = int(min_index % means_thresh.shape[1])
+    min_y = int(np.floor(min_index/means_thresh.shape[1]))
+
+    s_h = int(min_x * (l_h / 4))  # Horizontal index of the start of the box
+    s_v = int(min_y * (l_v / 4))
+
+    box_pixels = np.zeros_like(bandA)
+    box_pixels[s_v:s_v + l_v, s_h:s_h + l_h] = 1
+    box_pixels = np.where(flank_mask==0, 0, box_pixels)
+
+    illustration = np.where(box_pixels==0, bandA, np.min(bandA))
+    illustration = np.ma.masked_where(bandB==0, illustration)
+
+    plt.imshow(means)
+    plt.colorbar()
+    plt.show()
+    plt.imshow(ratio)
     plt.colorbar()
     plt.show()
 
-    #TODO Then select a point with relatively low entropy and low optical depth
+    #Plot the image, the AA, the variance, the thresholded variance
+    if plot == True:
+        fig, axs = plt.subplots(ncols=2, nrows=3)
+        axs[0,0].imshow(bandA, cmap="gray")
+        axs[0, 0].set_title("310nm", fontsize=10)
+        axs[0, 1].imshow(ratio, cmap="YlGnBu_r")
+        axs[0, 1].set_title("AA", fontsize=10)
+        axs[1, 0].imshow(vars, vmin=np.nanmin(vars), vmax=np.nanmax(vars))
+        axs[1, 0].set_title("Variance (Grid boxes)", fontsize=10)
+        axs[1, 1].imshow(thresh_vars, vmin=np.nanmin(vars), vmax=np.nanmax(vars))
+        axs[1, 1].set_title("Thresholded Variance", fontsize=10)
+        axs[2, 0].imshow(means_thresh, cmap="YlGnBu_r")
+        axs[2, 0].set_title("Thresholded Grid-box AA", fontsize=10)
+        axs[2, 1].imshow(illustration, cmap="gray")
+        axs[2, 1].set_title("Selected rectangle", fontsize=10)
+        plt.subplots_adjust(wspace=0, hspace=0.2)
+        for row in range(0, 2):
+            for col in range(0, 2):
+                axs[row, col].set_xticklabels([])
+                axs[row, col].set_yticklabels([])
+        plt.show()
 
-    return None
+    return box_pixels, "K-SR"
 
 def pyplis_rectangles_and_lines(bandA, plot=True, output="both"):
     '''Based on the image intensity, select three reference rectangles and

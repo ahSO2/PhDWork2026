@@ -13,12 +13,12 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Cotopaxi"]
+#locations = ["Kilauea"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 1
+mod = 15
 timesteps = ["image_name", "next_tensec_name"]
-save_results = True
+save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
@@ -61,23 +61,35 @@ for llo in locations: #Leaving out one location at a time
         smoothed_flank_mask = cv2.blur(flank_mask * 5, (20, 20))
         flank_mask = np.where(smoothed_flank_mask < 5, 0, 1)
 
+        #Calculate the reference areas with the chosen method
+        #ref_areas, method_name = delledonne_max_bandA(sequence[0], plot=False)
+        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=True)
+        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
+        #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
+        ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
+        #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
+        #ref_areas = smekens_repeated_fitting(sequence[0], flank_mask)
+
         if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
+            axs[0,0].set_title("310nm Frame 1", fontsize=10)
             axs[1,0].imshow(sequence_B[0], cmap="gray")
+            axs[1, 0].set_title("330nm Frame 1", fontsize=10)
             axs[0,1].imshow(sequence[1], cmap="gray")
+            axs[0, 1].set_title("310nm Frame 2", fontsize=10)
             axs[1,1].imshow(sequence_B[1], cmap="gray")
+            axs[1, 1].set_title("320nm Frame 2", fontsize=10)
             axs[0,2].imshow(plume_mask, cmap="gray")
+            axs[0, 2].set_title("Manual Plume Mask", fontsize=10)
             axs[1,2].imshow(flank_mask, cmap="gray")
+            axs[1, 2].set_title("Flank Mask", fontsize=10)
+            fig.subplots_adjust(wspace=0, hspace=0)
+            for row in range(0, 2):
+                for col in range(0, 3):
+                    axs[row, col].set_xticklabels([])
+                    axs[row, col].set_yticklabels([])
             plt.show()
-
-        #Calculate the reference areas with the chosen method
-        #ref_areas, method_name = delledonne_max_bandA(sequence[0], plot=False)
-        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
-        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
-        ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
-        #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        #ref_areas = smekens_repeated_fitting(sequence[0], flank_mask)
 
         #Mask out the flank area, incase the method hasn't included this already
         ref_areas = np.where(flank_mask == 1, ref_areas, 0)
