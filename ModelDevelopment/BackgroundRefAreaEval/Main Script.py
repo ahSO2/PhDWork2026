@@ -12,11 +12,11 @@ from RefAreaSelectionFunctions import *
 sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
-locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Kilauea"]
+#locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
+locations = ["Cotopaxi"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 15
+mod = 1
 timesteps = ["image_name", "next_tensec_name"]
 save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
@@ -63,10 +63,10 @@ for llo in locations: #Leaving out one location at a time
 
         #Calculate the reference areas with the chosen method
         #ref_areas, method_name = delledonne_max_bandA(sequence[0], plot=False)
-        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=True)
+        ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=True)
         #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
-        ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
+        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
         #ref_areas = smekens_repeated_fitting(sequence[0], flank_mask)
 

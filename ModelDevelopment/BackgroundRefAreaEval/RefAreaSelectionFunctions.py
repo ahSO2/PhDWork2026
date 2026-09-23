@@ -139,12 +139,12 @@ def delledonne_min_ratio(bandA, bandB, plot=False):
 
     if plot == True:
 
-        sky_region_to_show = sky_region.copy()
-        sky_region_to_show = cv2.circle(sky_region_to_show, center=(column_in_region, row_in_region), radius=circle_radius, color=100)
-        sky_region_to_show = np.ma.masked_where(sky_region_mask, sky_region_to_show)
-        plt.imshow(sky_region_to_show, vmin=np.ma.min(sky_region), vmax=np.ma.max(sky_region))
-        plt.colorbar()
-        plt.show()
+        #sky_region_to_show = sky_region.copy()
+        #sky_region_to_show = cv2.circle(sky_region_to_show, center=(column_in_region, row_in_region), radius=circle_radius, color=100)
+        #sky_region_to_show = np.ma.masked_where(sky_region_mask, sky_region_to_show)
+        #plt.imshow(sky_region_to_show, vmin=np.ma.min(sky_region), vmax=np.ma.max(sky_region))
+        #plt.colorbar()
+        #plt.show()
 
         img_to_show = ratio.copy()
         img_to_show = cv2.rectangle(img_to_show, (tl[1], tl[0]), (br[1], br[0]), color=100)

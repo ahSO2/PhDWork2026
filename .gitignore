@@ -1,6 +1,6 @@
 
 .idea/
-/StandardScripts/DataToView/
+/StandardScripts/ImageRegistration/DataToView/
 /Figures/Data/
 /ModelDevelopment/Segmentation/RoughResults/Model.pth
 /ModelDevelopment/Processing/__pycache__/
