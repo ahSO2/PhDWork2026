@@ -73,7 +73,7 @@ else: #Or set a known spectrometer FOV:
 #the surrounding samples needed for the calibration for that image
 for i in range(0, len(reventador_sequence.bandA_names)):
     print("Processing image: " + str(i) )
-    reventador_sequence.iterate(b=i, method="basic", mins=6)
+    reventador_sequence.iterate(b=i, method="basic", mins=1)
     #reventador_sequence.view_current_chunk(band="B", timesteps=[-10, 10])
     #Update the backgrounds, and calculate the absorbance for the new chunk (copying over any that were already calculated in the previous)
     reventador_sequence.estimate_backgrounds(method=background_method)

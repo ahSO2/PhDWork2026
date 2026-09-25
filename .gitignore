@@ -212,3 +212,10 @@ QualityIndexThings/Inter-LabellerAgreement/ManualLabels/KDAplha/CSVFilesToUpload
 QualityIndexThings/CalculatingMetrics/EvaluatingOnFullDays/FullDays_StdThreshold_OverallObsPredictions.csv
 
 ModelDevelopment/BackgroundRefAreaEval/__pycache__/
+/StandardScripts/DrawSMMs/RefImgs_Batch1_10bit/
+
+__pycache__/
+
+StandardScripts/DrawSMMs/UINT8_B1/Kilauea_1B_V2.png
+
+StandardScripts/DrawSMMs/UINT8_B1/

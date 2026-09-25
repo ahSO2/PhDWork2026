@@ -10,19 +10,19 @@ with the cv2.findtransformECC function. For each transform, plot the difference
 in pixel value between the band A image and each warped version, and the resulting
 absorbance image. '''
 
-band_A_path = "DataToView/2022-11-25T155910_fltrA_1ag_400000ss_Plume.png"
-band_B_path = "DataToView/2022-11-25T155910_fltrB_1ag_149987ss_Plume.png"
+band_A_path = "DataToView/2022-08-23T202225_fltrA_1ag_999904ss_Plume.png"
+band_B_path = "DataToView/2022-08-23T202225_fltrB_1ag_149987ss_Plume.png"
 
-clear_A = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Lastarria/2022-05-11T184240_fltrA_1ag_999904ss_Clear_DarkCorrected.png", -1)
-clear_B = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Lastarria/2022-05-11T184240_fltrB_1ag_299986ss_Clear_DarkCorrected.png", -1)
+clear_A = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Kilauea/View1_NoClear.png", -1)
+clear_B = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Kilauea/View1_NoClear.png", -1)
 
 #Sensor Mark Masks
 mask_path_A = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Images/Data_Updated23rdJune26/SensorMarkMasks/Lastarria_A.png"
-mask_path_B = "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Lastarria_B.png"
+mask_path_B = "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Images/Data_Updated23rdJune26/SensorMarkMasks/Lastarria_B.png"
 
 #Initial estimate of the registration transform
-registration_points_A = np.float32([[592,260], [454,286], [252,298], [410,201]])
-registration_points_B = np.float32([[605,264], [465,289], [261,299], [421,202]])
+registration_points_A = np.float32([[226, 373], [455,428], [220, 192], [555,242]])
+registration_points_B = np.float32([[232, 300], [456,352], [226, 120], [554,169]])
 
 #Reventador June 2025 dictionary
 #registration_points_A = np.float32([[88, 434], [327, 297], [434, 331], [499, 368]])
@@ -79,8 +79,9 @@ if type(clear_A) == np.ndarray:
     plt.imshow(bandB)
     plt.show()
 
-bandA = mask_sensor_marks(bandA, mask_path_A)
-bandB = mask_sensor_marks(bandB, mask_path_B)
+#cv2.imwrite("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/StandardScripts/DrawSMMs/RefImgs_Batch1_10bit/Merapi_0B_V2.png", bandB)
+#bandA = mask_sensor_marks(bandA, mask_path_A)
+#bandB = mask_sensor_marks(bandB, mask_path_B)
 
 visualise_registration_points(convert_to_UINT8(bandA), convert_to_UINT8(bandB), registration_points_A, registration_points_B)
 
