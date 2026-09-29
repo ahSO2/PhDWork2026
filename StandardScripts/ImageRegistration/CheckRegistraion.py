@@ -21,7 +21,11 @@ def mask_sensor_marks(image, mask_path):
         pass
     else:
         mask = cv2.imread(mask_path, -1)
+        plt.imshow(mask)
+        plt.show()
         image = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
+        plt.imshow(image)
+        plt.show()
     return image
 def calculate_diff(bandA, bandB):
     bandA_copy = bandA.copy()
@@ -61,27 +65,41 @@ def check_registration(image_A, image_B):
     plt.colorbar()
     plt.show()
 
-img_A = cv2.imread("DataToView/2022-08-19T142355_fltrA_1ag_899923ss_Plume.png", -1)
-img_B = cv2.imread("DataToView/2022-08-19T142355_fltrB_1ag_499991ss_Plume.png", -1)
-#img_B = np.concatenate([np.ones(shape=(300, 648)), img_B[:-300, :]], axis=0)
-points_A = np.float32([[226, 373], [455,428], [220, 192], [555,242]])
-points_B = np.float32([[232, 300], [456,352], [226, 120], [554,169]])
+img_A = cv2.imread("DataToView/2023-06-01T032305_fltrA_1ag_699997ss_Plume.png", -1)
+img_B = cv2.imread("DataToView/2023-06-01T032305_fltrB_1ag_59979ss_Plume.png", -1)
+clear_A = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Merapi/AveragedClearA_DarkCorrected.png", -1)
+clear_B = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Merapi/AveragedClearB_DarkCorrected.png", -1)
 
-img_A = mask_sensor_marks(img_A, "C:/Users/ggp24ash/Documents/Quality Index Write Up/Supplementary/Images/Data_Updated23rdJune26/SensorMarkMasks/Lascar_A.png")
-img_B = mask_sensor_marks(img_B, "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Lascar_B.png")
+
+#img_B = np.concatenate([np.ones(shape=(300, 648)), img_B[:-300, :]], axis=0)
+#points_A = np.float32([[226, 373], [455,428], [220, 192], [555,242]])
+#points_B = np.float32([[232, 300], [456,352], [226, 120], [554,169]])
+
+plt.imshow(img_A)
+plt.show()
+plt.imshow(img_B)
+plt.show()
+
+vin_mask_A = clear_A.astype(np.float32)/np.max(clear_A)
+img_A = np.divide(img_A, vin_mask_A)
+vin_mask_B = clear_B.astype(np.float32)/np.max(clear_B)
+img_B = np.divide(img_B, vin_mask_B)
+
+img_A = mask_sensor_marks(img_A, "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Merapi_5A.png")
+img_B = mask_sensor_marks(img_B, "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Merapi_0B_V2.png")
 
 
 #visualise_registration_points(img_A, img_B, points_A, points_B)
 
 #trans_matrix = cv2.getPerspectiveTransform(points_B, points_A)
-trans_matrix = np.array([[ 9.8550391e-01, -1.1097376e-02, 2.2677320e+01],
-                        [ 7.1288571e-03, 9.8456436e-01, 7.1595364e+00],
-                        [-3.5150382e-08, -1.7497523e-06,  1.0000000e+00]])
+trans_matrix = np.array([[ 9.8717630e-01, -3.2353610e-02, -4.5308247e+00],
+ [ 5.5157226e-03,  9.7894287e-01,  5.5395761e+00],
+ [ 6.2194173e-05, -9.1731679e-05,  1.0000000e+00]])
 transformed_B = cv2.warpPerspective(img_B, trans_matrix, dsize=(648,486))
 
-plt.imshow(transformed_B)
-plt.show()
-plt.imshow(img_A)
-plt.show()
+
+#plt.imshow(transformed_B)
+#plt.show()
+
 
 check_registration(img_A, transformed_B)
