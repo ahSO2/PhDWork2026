@@ -10,19 +10,19 @@ with the cv2.findtransformECC function. For each transform, plot the difference
 in pixel value between the band A image and each warped version, and the resulting
 absorbance image. '''
 
-band_A_path = "DataToView/2023-06-01T051420_fltrA_1ag_588352ss_Plume.png"
-band_B_path = "DataToView/2023-06-01T051420_fltrB_1ag_69985ss_Plume.png"
+band_A_path = "DataToView/2023-05-09T020905_fltrA_1ag_349993ss_Plume.png"
+band_B_path = "DataToView/2023-05-09T020905_fltrB_1ag_149987ss_Plume.png"
 
-clear_A = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Merapi/AveragedClearA_DarkCorrected.png", -1)
-clear_B = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Merapi/AveragedClearB_DarkCorrected.png", -1)
+clear_A = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Kilauea/View1_NoClear.png", -1)
+clear_B = cv2.imread("C:/Users/ggp24ash/Documents/Main Datasets/fromSharedDrive/SelectedClears/Kilauea/View1_NoClear.png", -1)
 
 #Sensor Mark Masks
-mask_path_A = "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Merapi_5A.png"
-mask_path_B = "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Merapi_0B_V2.png"
+mask_path_A = "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Kilauea_1A.png"
+mask_path_B = "C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/Kilauea_1B_V2.png"
 
 #Initial estimate of the registration transform
-registration_points_A = np.float32([[148, 311], [293, 266], [470, 341], [30, 331]])
-registration_points_B = np.float32([[163, 308], [310, 264], [488, 342], [40, 327]])
+registration_points_A = np.float32([[226, 373], [455,428], [220, 192], [555,242]])
+registration_points_B = np.float32([[232, 300], [456,352], [226, 120], [554,169]])
 
 #Reventador June 2025 dictionary
 #registration_points_A = np.float32([[88, 434], [327, 297], [434, 331], [499, 368]])
@@ -56,8 +56,6 @@ def mask_sensor_marks(image, mask_path):
         pass
     else:
         mask = cv2.imread(mask_path, -1)
-        plt.imshow(mask)
-        plt.show()
         image = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
     return image
 
@@ -74,10 +72,6 @@ if type(clear_A) == np.ndarray:
     bandA = np.divide(bandA, vin_mask_A)
     vin_mask_B = clear_B.astype(np.float32)/np.max(clear_B)
     bandB = np.divide(bandB, vin_mask_B)
-    plt.imshow(vin_mask_B)
-    plt.show()
-    plt.imshow(bandB)
-    plt.show()
 
 #cv2.imwrite("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/StandardScripts/DrawSMMs/RefImgs_Batch1_10bit/Merapi_0B_V2.png", bandB)
 bandA = mask_sensor_marks(bandA, mask_path_A)
@@ -94,6 +88,10 @@ criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, n, eps)
 initial_matrix = cv2.getPerspectiveTransform(registration_points_B, registration_points_A)
 print("Manual matrix:")
 print(initial_matrix)
+
+#initial_matrix = np.array([[ 9.84239318e-01, -6.07894544e-03, -4.46183545e+00],
+#                                                            [-7.32044050e-03,  9.83003865e-01,  7.32911430e+01],
+#                                                            [-4.15740511e-05, -2.59909527e-05,  1.00000000e+00]])
 
 value, optimal_matrix = cv2.findTransformECC(templateImage=bandB_f32, inputImage=bandA_f32, warpMatrix=initial_matrix.astype(np.float32),
                      motionType=cv2.MOTION_HOMOGRAPHY, criteria=criteria)

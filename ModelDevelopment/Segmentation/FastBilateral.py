@@ -137,12 +137,12 @@ sample_activation = sample_activation * 100
 #show(ss_img)
 #show(ss_edge)
 
-#cProfile.run("cross_bilateral_filter_fast(sample_activation, sample_img, sigma_s=15, sigma_r=4, sa_s=2, sa_r=2)", filename="profile.out")
+result = cross_bilateral_filter_fast(sample_activation, sample_img, sigma_s=15, sigma_r=4, sa_s=2, sa_r=2)
 
 
 
-#fig, axs = plt.subplots(ncols=3)
-#axs[0].imshow(sample_img, cmap="gray")
-#axs[1].imshow(sample_activation, cmap="gray")
-#axs[2].imshow(result, cmap="gray")
-#plt.show()
+fig, axs = plt.subplots(ncols=3)
+axs[0].imshow(sample_img, cmap="gray")
+axs[1].imshow(sample_activation, cmap="gray")
+axs[2].imshow(result, cmap="gray")
+plt.show()

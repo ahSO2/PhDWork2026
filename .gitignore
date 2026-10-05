@@ -219,3 +219,7 @@ __pycache__/
 StandardScripts/DrawSMMs/UINT8_B1/Kilauea_1B_V2.png
 
 StandardScripts/DrawSMMs/UINT8_B1/
+
+StandardScripts/DrawSMMs/RawMasks_Batch1/
+
+StandardScripts/DrawSMMs/SMMs_Batch1/

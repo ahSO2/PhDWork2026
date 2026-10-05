@@ -55,18 +55,22 @@ def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
     return ref_areas
 
 
-def delledonne_max_bandA(bandA, plot=False):
+def delledonne_max_bandA(bandA, bandB, plot=False):
     '''Select the maximum pixel value in the band A image within a rectangular
     region at the top of the image. Select a small circular region around this
     point from which to take the average band A value. '''
 
     tl = (30, 30)
     br = (130, 618)
-    sky_region = bandA[tl[0]:br[0] + 1, tl[1]:br[1]+1]
+    sky_region = bandA[tl[0]:br[0] + 1, tl[1]:br[1]+1].copy()
     circle_radius = 20
 
     #Smooth the sky region so that noise doesn't affect the maximum
     sky_region = cv2.blur(sky_region, (5,5))
+
+    #Set any values which overlap with the area where band B is zero to the minimum value, so that they don't get selected as the reference value
+    region_bandB = bandB[tl[0]:br[0] + 1, tl[1]:br[1]+1].copy()
+    sky_region = np.where(region_bandB == 0, np.min(sky_region), sky_region)
 
     max_flattened = np.argmax(sky_region)
     row_in_region = int(np.floor(max_flattened/sky_region.shape[1]))
@@ -112,12 +116,12 @@ def delledonne_min_ratio(bandA, bandB, plot=False):
     #Blur slightly to avoid small imperfections impacting the min value
     #Again mask out edges which are introduced by the blur
     ratio = cv2.blur(ratio, (5, 5))
-    bandB_zero = np.where(bandB==0, 3, 0)
+    bandB_zero = np.where(bandB==0, 5, 0)
     edge_mask = cv2.blur(bandB_zero, (11, 11))
-    edge_mask[:, 0] = 1
-    edge_mask[:, -1] = 1
-    edge_mask[0, :] = 1
-    edge_mask[-1, :] = 1
+    edge_mask[:, 0:6] = 1
+    edge_mask[:, -5:] = 1
+    edge_mask[0:6, :] = 1
+    edge_mask[-5:, :] = 1
     ratio = np.ma.masked_where(edge_mask>0, ratio)
 
     #Select the sky region, copying over the masked areas too
@@ -154,6 +158,10 @@ def delledonne_min_ratio(bandA, bandB, plot=False):
         plt.imshow(img_to_show, cmap="YlGnBu_r", vmin=np.ma.min(ratio), vmax=np.ma.max(ratio))
         plt.colorbar()
         plt.show()
+        plt.imshow(bandA)
+        plt.show()
+        plt.imshow(bandB)
+        plt.show()
     return circle_mask, "D-R"
 
 def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
@@ -171,10 +179,10 @@ def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
     ratio = cv2.blur(ratio, (5, 5))
     bandB_zero = np.where(bandB == 0, 3, 0)
     edge_mask = cv2.blur(bandB_zero, (11, 11))
-    edge_mask[:, 0] = 1
-    edge_mask[:, -1] = 1
-    edge_mask[0, :] = 1
-    edge_mask[-1, :] = 1
+    edge_mask[:, 0:6] = 1
+    edge_mask[:, -5:] = 1
+    edge_mask[0:6, :] = 1
+    edge_mask[-5:, :] = 1
     ratio = np.ma.masked_where(edge_mask > 0, ratio)
     plt.imshow(ratio, cmap="YlGnBu_r")
     plt.colorbar()
@@ -209,12 +217,13 @@ def kern_low_texture_and_ratio(bandA, bandB, flank_mask, plot=False):
     #First mask out the edges which cause artifical high absorbance values,
     #Masking out the flank at the same time
     bandA_copy = bandA.copy()
-    edge_mask = np.where(bandB==0, 0, flank_mask) * 5
+    edge_mask = np.where(bandB==0, 0, 5)
     edge_mask = cv2.blur(edge_mask, (5, 5))
-    edge_mask[:,0] = 0
-    edge_mask[:,-1] = 0
-    edge_mask[0,:] = 0
-    edge_mask[-1,:] = 0
+    edge_mask = np.where(flank_mask == 0, 0, edge_mask)
+    edge_mask[:,0:6] = 0
+    edge_mask[:,-5:] = 0
+    edge_mask[0:6,:] = 0
+    edge_mask[-5:,:] = 0
     bandA_copy = np.ma.masked_where(edge_mask < 5, bandA_copy)
 
     #Then calculate the absorbance (without accounting for backgrounds)
@@ -227,6 +236,7 @@ def kern_low_texture_and_ratio(bandA, bandB, flank_mask, plot=False):
 
     means = np.empty(shape=(37,37))
     vars = np.empty(shape=(37,37))
+    unmasked_prop = np.empty(shape=(37, 37)) #The proportion of the box which intersects with edge or flank
     for i in range(0, 37): #Horizontal
         for j in range(0, 37): #Vertical
             s_h = int(i * (l_h/4)) #Horizontal index of the start of the box
@@ -238,17 +248,22 @@ def kern_low_texture_and_ratio(bandA, bandB, flank_mask, plot=False):
             if np.array_equal(mask, np.ones_like(mask)):
                 box_mean = np.nan
                 var = np.nan
+                prop = 0
             else:
                 box_mean = np.ma.mean(box)
                 unmasked_pixels = box.compressed()
                 var = np.var(unmasked_pixels)
+                prop = unmasked_pixels.shape[0]/(box.shape[0] * box.shape[1])
 
             means[j, i] = box_mean
             vars[j, i] = var
+            unmasked_prop[j, i] = prop
 
     #Select threshold on variance:
     vars = np.ma.masked_invalid(vars)
-    thresh = calc_bin_thresh(vars, plot=True)
+    # Exclude any boxes which have >50% masked pixels:
+    vars.mask = np.where(unmasked_prop < 0.5, 1, vars.mask)
+    thresh = calc_bin_thresh(vars, plot=False)
 
     thresh_vars = np.ma.where(vars < thresh, vars, np.nan)
     means_thresh = np.ma.where(vars < thresh, means, np.nan)
@@ -267,13 +282,6 @@ def kern_low_texture_and_ratio(bandA, bandB, flank_mask, plot=False):
 
     illustration = np.where(box_pixels==0, bandA, np.min(bandA))
     illustration = np.ma.masked_where(bandB==0, illustration)
-
-    plt.imshow(means)
-    plt.colorbar()
-    plt.show()
-    plt.imshow(ratio)
-    plt.colorbar()
-    plt.show()
 
     #Plot the image, the AA, the variance, the thresholded variance
     if plot == True:
@@ -385,7 +393,7 @@ def polynomial_fit(masked_image, degree=2, plot=False):
     return fitted_image
 
 
-def smekens_repeated_fitting(bandA, flank_mask):
+def smekens_repeated_fitting(bandA, flank_mask, plot=False):
     '''Identify sky reference areas by repeatedly fitting a 2nd degree 2D polynomial to the
     sky pixels, and excluding any pixels which are not well represented. '''
 
@@ -411,9 +419,71 @@ def smekens_repeated_fitting(bandA, flank_mask):
 
         if np.array_equal(sky_mask, prev_sky_mask): #If the sky mask hasn't changed (i.e all pixels are approximated within 3%)
             repeat = False
-            plt.imshow(sky_mask)
-            plt.title("Final sky ref areas")
-            plt.show()
+            if plot == True:
+                fig, axs = plt.subplots(ncols=3)
+                u = np.max(bandA)
+                l = np.min(bandA)
+                axs[0].imshow(bandA, cmap="gray", vmax=u, vmin=l)
+                axs[0].set_title("Band A")
+                axs[1].imshow(np.where(sky_mask == 1, bandA, l), cmap="gray", vmax=u, vmin=l)
+                axs[1].set_title("Selected Ref Areas")
+                axs[2].imshow(polyfit_sky, cmap="gray", vmax=u, vmin=l)
+                axs[2].set_title("Polyfit sky estimation")
+                plt.show()
+    return sky_mask, "S-RF"
 
-    return sky_mask
+def show(image, colormap="gray", title="None"):
+    plt.imshow(image, cmap=colormap)
+    if "None" in title:
+        pass
+    else:
+        plt.title(title)
+    plt.colorbar()
+    plt.show()
+
+def rough_AA(bandA, bandB, edge_mask):
+    bandA_copy = np.ma.masked_where(edge_mask > 0, bandA)
+    ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
+    ratio = -1 * np.ma.log(ratio)
+    return ratio
+
+def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
+
+    bandB_zero = np.where(bandB == 0, 5, 0)
+    edge_mask = cv2.blur(bandB_zero, (11, 11))
+    edge_mask[:, 0:6] = 1
+    edge_mask[:, -5:] = 1
+    edge_mask[0:6, :] = 1
+    edge_mask[-5:, :] = 1
+
+    #Calculate brightness
+    brightness = min_max_scale(bandA)
+    show(bandA)
+
+    #Rough AA
+    ratio = rough_AA(bandA, bandB, edge_mask)
+    #ratio = np.ma.where(ratio > 0, ratio, 0)
+    show(ratio)
+
+    #Smoothness #TODO
+
+
+    #TODO Previously I have smoothed/scaled the images before taking the difference
+    #Movement (frame difference)
+    diff = np.abs(bandA.astype(np.float32) - bandB.astype(np.float32))
+    diff = np.ma.masked_where(edge_mask > 0, diff)
+    #show(diff)
+
+    #Movement (frame difference in AA)
+    #TODO Potentially use the variance of this channel (similar to Kern's method but should reduce impact of non-plume objecte)
+    ts_ratio = rough_AA(ts_bandA, ts_bandB, edge_mask)
+    AA_diff = np.abs(ratio - ts_ratio)
+    show(AA_diff, colormap="YlGnBu_r", title="AA time difference")
+
+    #Smekens repeated fitting mask
+
+
+    #Input into morph transform/bilateral filter/ML model
+
+    return np.ones_like(bandA), "CC"
 

@@ -1,3 +1,4 @@
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -120,4 +121,45 @@ def location_balanced_mean_with_95p_bootstrap(values, locations, rng):
     return np.round(balanced_mean, 4), np.round(lower, 4), np.round(upper, 4), rng
 
 
+def variance_ratio(bandA, bandB, selected_ref_area, manual_ref_area, flank_mask):
+    '''Calculate the rough absorbance, then take the ratio of its standard deviation in the selected
+    reference area over the ground truth reference area.'''
 
+    #Mask out where bandB = 0
+    inv_flank_mask = np.where(flank_mask == 0, 1, 0)
+    bandB_zero_mask = np.where(bandB == 0, 5, 0)
+    edge_mask = cv2.blur(bandB_zero_mask, (5, 5))
+    edge_mask[:, 0:6] = 1
+    edge_mask[:, -5:] = 1
+    edge_mask[0:6, :] = 1
+    edge_mask[-5:, :] = 1
+    edge_mask = edge_mask + inv_flank_mask
+
+    bandA_copy = bandA.copy()
+    bandA_copy = np.ma.masked_where(edge_mask>0, bandA_copy)
+
+    # Then calculate the absorbance (without accounting for backgrounds)
+    ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
+    ratio = -1 * np.ma.log(ratio)
+
+    selected_values = np.ma.masked_where(selected_ref_area == 0, ratio)
+    selected_values.mask = np.where(edge_mask > 0, 1, selected_values.mask)
+    selected_values = selected_values.compressed()
+
+    gt_values = np.ma.masked_where(manual_ref_area == 0, ratio)
+    gt_values.mask = np.where(edge_mask > 0, 1, gt_values.mask)
+    gt_values = gt_values.compressed()
+
+    if selected_values.shape[0] > 0:
+        selected_sd = np.std(selected_values)
+    else:
+        selected_sd = 0
+    if gt_values.shape[0] > 0:
+        gt_sd = np.std(gt_values)
+    else:
+        gt_sd = 0
+
+    if gt_sd == 0: #If the ground truth reference area is constant or doesn't have any area
+        return 1
+    else:
+        return min(selected_sd/gt_sd, 1) #Return the proportion of the standard deviation that is represented (1 if the ref area gives an accurate or an overestimation of the background veriability)

@@ -28,10 +28,11 @@ def read_sample(sample_index, df, timesteps, band, volcano_dictionary, paths_dic
         name_to_read = df[timestep_name][sample_index]
         timestep_image = cv2.imread(folder_to_read + "/" + name_to_read, -1)
 
-        if "fltrB" in name_to_read:
-            timestep_image = mask_sensor_marks(timestep_image, smmn_B, paths_dictionary)
-        else:
-            timestep_image = mask_sensor_marks(timestep_image, smmn_A, paths_dictionary)
+        #TODO Removed - because sensor mark masking was included already in my updated corrections
+        #if "fltrB" in name_to_read:
+        #    timestep_image = mask_sensor_marks(timestep_image, smmn_B, paths_dictionary)
+        #else:
+        #    timestep_image = mask_sensor_marks(timestep_image, smmn_A, paths_dictionary)
 
         sequence.append(timestep_image)
         names.append(name_to_read)

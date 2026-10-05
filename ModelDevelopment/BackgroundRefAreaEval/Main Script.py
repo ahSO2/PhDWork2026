@@ -12,25 +12,25 @@ from RefAreaSelectionFunctions import *
 sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
-#locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-locations = ["Cotopaxi"]
+locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
+#locations = ["Reventador"]
 filter_for_quality = "Good"
-set_to_consider = "UnseenTest"
-mod = 1
+set_to_consider = "Train"
+mod = 7
 timesteps = ["image_name", "next_tensec_name"]
 save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
-                    "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2",
-                    "data_path_temporal":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_CorrectedWithVolcDict2Temporal",
+                    "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026/",
+                    "data_path_temporal":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026_Temporal/",
                     "segmentation_masks_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/ProcessedLabels_UpdatedAfterReview/",
-                    "sensor_mark_masks_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/SensorMarkMasks/",
+                    "sensor_mark_masks_path":"C:/Users/ggp24ash/Documents/Main Datasets/SensorMarkMasks/",
                     "flank_masks_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"}
 
 ##################### Script
-columns = ["image_name", "volcano_name", "PP", "PN", "RP", "RN", "IOU", "F1_AD"] #Metrics to save per image
-summary_columns = ["fold", "PP", "PP_L", "PP_U", "PN", "PN_L", "PN_U", "RP", "RP_L", "RP_U", "RN", "RN_L", "RN_U", "IOU", "IOU_L", "IOU_U", "F1_AD_M", "F1_AD_L", "F1_AD_U"]
+columns = ["image_name", "volcano_name", "PP", "PN", "RP", "RN", "IOU", "F1", "VR"] #Metrics to save per image
+summary_columns = ["fold", "PP", "PP_L", "PP_U", "PN", "PN_L", "PN_U", "RP", "RP_L", "RP_U", "RN", "RN_L", "RN_U", "IOU", "IOU_L", "IOU_U", "F1_M", "F1_L", "F1_U", "VR", "VR_L", "VR_U"]
 overall_CV_fold_results_df = pd.DataFrame(columns=summary_columns) #Dataframe to store summary results for each fold
 all_samples_metrics = pd.DataFrame(columns=columns)
 for llo in locations: #Leaving out one location at a time
@@ -38,7 +38,7 @@ for llo in locations: #Leaving out one location at a time
     metrics_df = pd.DataFrame(columns=columns)
 
     print("Running tests on " + llo + "-left-out CV Fold.")
-    samples_df = pd.read_excel(paths_dictionary["df_path"] + llo + "_" + set_to_consider + ".xlsx")
+    samples_df = pd.read_excel(paths_dictionary["df_path"] + llo + "LeftOut_" + set_to_consider + ".xlsx")
 
     if filter_for_quality == "Good":
         samples_df = samples_df[samples_df["overall_obs"] == "No"]
@@ -62,13 +62,14 @@ for llo in locations: #Leaving out one location at a time
         flank_mask = np.where(smoothed_flank_mask < 5, 0, 1)
 
         #Calculate the reference areas with the chosen method
-        #ref_areas, method_name = delledonne_max_bandA(sequence[0], plot=False)
-        ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=True)
-        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
+        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=False)
+        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
+        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=True, output="both")
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
-        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
+        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        #ref_areas = smekens_repeated_fitting(sequence[0], flank_mask)
+        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
+        ref_areas, method_name = custom_combined(sequence[0], sequence_B[0], sequence[1], sequence_B[1], flank_mask, plot=True)
 
         if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -109,7 +110,8 @@ for llo in locations: #Leaving out one location at a time
         PP, PN = per_class_precision(TP, TN, FP, FN)
         RP, RN = per_class_recall(TP, TN, FP, FN)
         IOU = intersection_over_union(TP, TN, FP, FN)
-        F1_modified = F1_score(RN, RP) #TODO I have modified the inputs so we have a harmonic mean of the two quantities that are most informative in this application
+        F1 = F1_score(PP, RP)
+        VR = variance_ratio(sequence[0], sequence_B[0], ref_areas, ground_truth_bg, flank_mask)
 
         new_row = {"image_name": names[0],
                    "volcano_name": samples_df["volcano_name"][sample_index],
@@ -118,7 +120,8 @@ for llo in locations: #Leaving out one location at a time
                    "RP":RP,
                    "RN":RN,
                    "IOU":IOU,
-                   "F1_AD":F1_modified}
+                   "F1":F1,
+                   "VR":VR}
         metrics_df.loc[len(metrics_df)] = new_row
         all_samples_metrics.loc[len(all_samples_metrics)] = new_row
 
@@ -134,7 +137,8 @@ for llo in locations: #Leaving out one location at a time
     RP_M, RP_L, RP_U, rng = mean_with_95p_bootstrap(metrics_df["RP"].to_numpy(), rng)
     RN_M, RN_L, RN_U, rng = mean_with_95p_bootstrap(metrics_df["RN"].to_numpy(), rng)
     IOU_M, IOU_L, IOU_U, rng = mean_with_95p_bootstrap(metrics_df["IOU"].to_numpy(), rng)
-    F1_M, F1_L, F1_U, rng = mean_with_95p_bootstrap(metrics_df["F1_AD"].to_numpy(), rng)
+    F1_M, F1_L, F1_U, rng = mean_with_95p_bootstrap(metrics_df["F1"].to_numpy(), rng)
+    VR_M, VR_L, VR_U, rng = mean_with_95p_bootstrap(metrics_df["VR"].to_numpy(), rng)
     summary_row = {"fold": llo,
                    "PP":PP_M,
                    "PP_L":PP_L,
@@ -151,9 +155,12 @@ for llo in locations: #Leaving out one location at a time
                    "IOU":IOU_M,
                    "IOU_L":IOU_L,
                    "IOU_U":IOU_U,
-                   "F1_AD_M":F1_M,
-                   "F1_AD_L":F1_L,
-                   "F1_AD_U":F1_U}
+                   "F1_M":F1_M,
+                   "F1_L":F1_L,
+                   "F1_U":F1_U,
+                   "VR":VR_M,
+                   "VR_L":VR_L,
+                   "VR_U":VR_U}
     overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = summary_row
 
 #Calculate the location-balanced mean metrics (with bootstrap CIs)
@@ -162,7 +169,8 @@ PN_M, PN_L, PN_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_me
 RP_M, RP_L, RP_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["RP"].to_numpy(), all_samples_metrics["volcano_name"], rng)
 RN_M, RN_L, RN_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["RN"].to_numpy(), all_samples_metrics["volcano_name"], rng)
 IOU_M, IOU_L, IOU_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["IOU"].to_numpy(), all_samples_metrics["volcano_name"], rng)
-F1_M, F1_L, F1_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["F1_AD"].to_numpy(), all_samples_metrics["volcano_name"], rng)
+F1_M, F1_L, F1_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["F1"].to_numpy(), all_samples_metrics["volcano_name"], rng)
+VR_M, VR_L , VR_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["VR"].to_numpy(), all_samples_metrics["volcano_name"], rng)
 mean_over_folds_row = {"fold": "location-balanced",
                    "PP":PP_M,
                    "PP_L":PP_L,
@@ -179,9 +187,12 @@ mean_over_folds_row = {"fold": "location-balanced",
                    "IOU":IOU_M,
                    "IOU_L":IOU_L,
                    "IOU_U":IOU_U,
-                   "F1_AD_M":F1_M,
-                   "F1_AD_L":F1_L,
-                   "F1_AD_U":F1_U}
+                   "F1_M":F1_M,
+                   "F1_L":F1_L,
+                   "F1_U":F1_U,
+                   "VR":VR_M,
+                   "VR_L":VR_L,
+                   "VR_U":VR_U}
 overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = mean_over_folds_row
 
 #Save the summary df
