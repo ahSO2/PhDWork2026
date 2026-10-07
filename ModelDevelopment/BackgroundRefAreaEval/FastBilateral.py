@@ -120,7 +120,7 @@ def cross_bilateral_filter_fast(image, ref_img, sigma_s, sigma_r, sa_s, sa_r):
     wb = np.reshape(wb, (image.shape[0], image.shape[1]))
     #show(wb)
 
-    #Part b) Divide the across_bilateral_filter_fast(sample_activation, sample_img, sigma_s=15, sigma_r=4, sa_s=2, sa_r=2)rrays to get the normalised result.
+    #Part b) Divide the arrays to get the normalised result.
     filtered_result = np.divide(wb_ib, wb)
     #show(wb_ib)
     #show(wb)
@@ -137,7 +137,7 @@ def cross_bilateral_filter_fast(image, ref_img, sigma_s, sigma_r, sa_s, sa_r):
 #show(ss_img)
 #show(ss_edge)
 
-#result =
+#result = cross_bilateral_filter_fast(sample_activation, sample_img, sigma_s=15, sigma_r=4, sa_s=2, sa_r=2)
 
 
 

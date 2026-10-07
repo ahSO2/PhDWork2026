@@ -13,10 +13,10 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Reventador"]
+#locations = ["Kilauea"]
 filter_for_quality = "Good"
 set_to_consider = "Train"
-mod = 7
+mod = 10
 timesteps = ["image_name", "next_tensec_name"]
 save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
@@ -68,10 +68,10 @@ for llo in locations: #Leaving out one location at a time
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
         #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
+        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=True)
         ref_areas, method_name = custom_combined(sequence[0], sequence_B[0], sequence[1], sequence_B[1], flank_mask, plot=True)
 
-        if sample_index < 0: #Plot the timesteps and masks
+        if sample_index < 1000: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
             axs[0,0].set_title("310nm Frame 1", fontsize=10)

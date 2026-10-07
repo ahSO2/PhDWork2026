@@ -7,11 +7,12 @@ from skimage.filters.rank import entropy
 from skimage.morphology import disk
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
+from FastBilateral import *
 
 def min_max_scale(img):
-    '''Scale image to range [0, 1].'''
-    img_min = np.min(img)
-    img_max = np.max(img)
+    '''Scale image to range [0, 1], considering only unmasked pixels.'''
+    img_min = np.ma.min(img)
+    img_max = np.ma.max(img)
     scaled_img = (img - img_min)/(img_max-img_min)
     return scaled_img
 def calc_bin_thresh(image, plot=False):
@@ -19,11 +20,16 @@ def calc_bin_thresh(image, plot=False):
     containing the most common values.'''
 
     n_bins = 10
-    counts, bins = np.histogram(image.compressed(), n_bins, [np.nanmin(image), np.nanmax(image)])
-    bin_length = np.abs(np.nanmax(image) - np.nanmin(image)) / n_bins
+    if np.ma.is_masked(image):
+        values = image.compressed()
+    else:
+        values = image.flatten()
+
+    counts, bins = np.histogram(values, n_bins, [np.nanmin(values), np.nanmax(values)])
+    bin_length = np.abs(np.nanmax(values) - np.nanmin(values)) / n_bins
 
     max_bin_index = np.argmax(counts) #Index of tallest bin (starting from 0)
-    rhs_boundary = bins[max_bin_index + 1] - bin_length/2
+    rhs_boundary = bins[max_bin_index + 1]
 
     if plot == True:
         bin_centers = np.linspace(bin_length / 2, bin_length * (n_bins - 1 + 0.5), n_bins)
@@ -392,7 +398,6 @@ def polynomial_fit(masked_image, degree=2, plot=False):
 
     return fitted_image
 
-
 def smekens_repeated_fitting(bandA, flank_mask, plot=False):
     '''Identify sky reference areas by repeatedly fitting a 2nd degree 2D polynomial to the
     sky pixels, and excluding any pixels which are not well represented. '''
@@ -447,7 +452,58 @@ def rough_AA(bandA, bandB, edge_mask):
     ratio = -1 * np.ma.log(ratio)
     return ratio
 
+def scale_by_percentile(img1, img2, p):
+    '''Scale either image using the 95th percentile values.'''
+    if np.ma.is_masked(img1):
+        img1_values = img1.compressed()
+        img2_values = img2.compressed()
+    else:
+        img1_values = img1.flatten()
+        img2_values = img2.flatten()
+    p95_1 = np.percentile(img1_values, p)
+    p95_2 = np.percentile(img2_values, p)
+
+    if p95_1 > p95_2:
+        scale_factor = p95_1/p95_2
+        scaled_2 = img2.astype(np.float32) * scale_factor
+        return img1.astype(np.float32), scaled_2
+    else:
+        scale_factor = p95_2/p95_1
+        scaled_1 = img1.astype(np.float32) * scale_factor
+        return scaled_1, img2.astype(np.float32)
+
+def grid_sd(image):
+    '''Return a gridded image showing the standard deviation in each rectangle
+    of the original image, with any rectagles overlapping > 50% with masked
+    areas excluded.'''
+
+    box_size = 20
+
+    nv = int(np.floor(image.shape[0]/box_size))
+    nh = int(np.floor(image.shape[1]/box_size))
+
+    result_img = np.ones_like(image) * 100
+    unmasked_perc = np.zeros_like(image)
+
+    for i in range(1, nv + 1):
+        for j in range(1, nh + 1):
+            box = image[(i-1) * box_size: i * box_size, (j-1)*box_size:j* box_size]
+            box = np.ma.masked_where(image[(i-1) * box_size: i * box_size, (j-1)*box_size:j* box_size].mask, box)
+            box_sd = np.ma.std(box)
+            result_img[(i-1) * box_size: i * box_size, (j-1)*box_size:j* box_size] = box_sd
+
+            n_unmasked = box.compressed().shape[0]
+            unmasked_prop = n_unmasked/(box_size * box_size)
+            unmasked_perc[(i - 1) * box_size: i * box_size, (j - 1) * box_size:j * box_size] = unmasked_prop
+
+    #Mask out edges which are not covered by a box, or edges which are masked in the original image
+    new_mask = np.where(result_img == 100, 1, image.mask)
+    #Mask out boxes for which less than 50% is unmasked
+    new_mask = np.where(unmasked_perc < 0.5, 1, new_mask)
+    result_img = np.ma.masked_where(new_mask, result_img)
+    return result_img
 def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
+    #TODO For each channel, create a mask in range [0, 1] indicating likelihood of being background
 
     bandB_zero = np.where(bandB == 0, 5, 0)
     edge_mask = cv2.blur(bandB_zero, (11, 11))
@@ -456,33 +512,98 @@ def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     edge_mask[0:6, :] = 1
     edge_mask[-5:, :] = 1
 
-    #Calculate brightness
+    #1. Brightness relative to the rest of the image
     brightness = min_max_scale(bandA)
-    show(bandA)
+    #show(bandA)
 
-    #Rough AA
+    #2. Rough AA - Shifted based on value at flank and then capped at range [0, 1]
     ratio = rough_AA(bandA, bandB, edge_mask)
-    #ratio = np.ma.where(ratio > 0, ratio, 0)
-    show(ratio)
+    shifted_flank_mask = np.concatenate([np.ones(shape=(20, flank_mask.shape[1])), flank_mask[0:-20, :]], axis=0)
+    flank_mean = np.ma.masked_where(shifted_flank_mask == 1, ratio)
+    flank_mean.mask = np.where(edge_mask > 0, 1, flank_mean.mask)
+    flank_mean = np.ma.mean(flank_mean)
+    #Scale the ratio such that the flank has a zero value
+    ratio = ratio - flank_mean
+    #Threshold to [0, 1]
+    ratio = np.ma.where(ratio > 0, ratio, 0)
+    ratio = np.where(ratio < 1, ratio, 1)
+    #show(ratio, colormap="YlGnBu_r")
 
-    #Smoothness #TODO
+    #Movement (frame difference) ######################################
+    #diff = np.abs(bandA.astype(np.float32) - ts_bandA.astype(np.float32))
+    #diff = np.ma.masked_where(edge_mask > 0, diff)
+    # Try scaling bandB so that the 95% value is equal to band A's
+    #masked_A = np.ma.masked_where(edge_mask>0, bandA)
+    #masked_tsA = np.ma.masked_where(edge_mask>0, ts_bandA)
+    scaled_A, scaled_ts = scale_by_percentile(bandA, ts_bandA, 95)
+    scaled_diff = np.abs(scaled_A.astype(np.float32) - scaled_ts.astype(np.float32))
+    scaled_diff = np.ma.masked_where(edge_mask > 0, scaled_diff)
+    #thresh = calc_bin_thresh(scaled_diff, plot=True)
+    scaled_diff = cv2.blur(scaled_diff, (10, 10))
+    scaled_diff = np.ma.masked_where(edge_mask > 0, scaled_diff)
+    thresh_blurred = calc_bin_thresh(scaled_diff, plot=False)
+    mvmt_above_noise = np.where(scaled_diff > thresh_blurred, scaled_diff, 0)
+    mvmt_above_noise = min_max_scale(mvmt_above_noise)
+    #TODO What if there is no movement?
 
+    #fig, axs = plt.subplots(ncols=2)
+    #axs[0].imshow(scaled_diff)
+    #axs[0].set_title("Scaled Difference")
+    #axs[1].imshow(mvmt_above_noise)
+    #axs[1].set_title("Movement ID")
+    #plt.show()
+    ###########################################################
 
-    #TODO Previously I have smoothed/scaled the images before taking the difference
-    #Movement (frame difference)
-    diff = np.abs(bandA.astype(np.float32) - bandB.astype(np.float32))
-    diff = np.ma.masked_where(edge_mask > 0, diff)
-    #show(diff)
-
-    #Movement (frame difference in AA)
-    #TODO Potentially use the variance of this channel (similar to Kern's method but should reduce impact of non-plume objecte)
+    #Smoothness in AA
+    #TODO Potentially use the variance of this channel (similar to Kern's method but should reduce impact of non-plume object)
+    og_ratio = rough_AA(bandA, bandB, edge_mask)
     ts_ratio = rough_AA(ts_bandA, ts_bandB, edge_mask)
+    scaled_og, scaled_ts = scale_by_percentile(og_ratio, ts_ratio, 5)
     AA_diff = np.abs(ratio - ts_ratio)
-    show(AA_diff, colormap="YlGnBu_r", title="AA time difference")
+    AA_diff = np.where(AA_diff > 1, 1, AA_diff)
+    AA_diff = np.where(AA_diff < 0, 0, AA_diff)
+    #show(AA_diff, colormap="YlGnBu_r", title="AA time difference")
+
+    inv_flank_mask = np.where(flank_mask > 0, 0, 1)
+    mask_out = edge_mask + inv_flank_mask
+    mask_in = np.where(mask_out > 0, 0, 1)
+    #show(mask_in)
+    #entropy_diff = entropy(image=AA_diff, footprint=disk(20), mask=mask_in)
+    #show(entropy_diff, colormap="YlGnBu_r", title="Entropy of AA time diff")
+    AA_sd = grid_sd(np.ma.masked_where(mask_in == 0, AA_diff))
+    AA_sd = min_max_scale(AA_sd)
+    #show(AA_sd, colormap="Spectral")
+
+
+
+    a = 1
+    b = 1
+    c = 1
+    d = 1
+
+    darkness = np.ones_like(brightness) - brightness
+    t = a * darkness + b * ratio + c * mvmt_above_noise + d * AA_sd
+    ts = cross_bilateral_filter_fast(t, bandA, sigma_s=10, sigma_r=20, sa_s=5, sa_r=10)
+
+    fig, axs = plt.subplots(nrows=3, ncols=2)
+    axs[0, 0].imshow(a * darkness, vmax=1, vmin=0, cmap="gray")
+    axs[0, 0].set_title("Darkness BandA")
+    axs[0, 1].imshow(b * ratio, vmax=1, vmin=0, cmap="gray")
+    axs[0, 1].set_title("Roughly calculated AA")
+    axs[1, 0].imshow(c * mvmt_above_noise, vmax=1, vmin=0, cmap="gray")
+    axs[1, 0].set_title("Moving areas")
+    axs[1, 1].imshow(d * AA_sd, vmax=1, vmin=0, cmap="gray")
+    axs[1, 1].set_title("Texture in AA")
+    axs[2, 0].imshow(t, cmap="gray")
+    axs[2, 0].set_title("Total Activation")
+    axs[2, 1].imshow(ts, cmap="gray")
+    axs[2, 1].set_title("Smoothed Activation")
+    plt.show()
+
+
+
 
     #Smekens repeated fitting mask
-
-
     #Input into morph transform/bilateral filter/ML model
 
     return np.ones_like(bandA), "CC"
