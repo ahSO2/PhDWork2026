@@ -502,6 +502,11 @@ def grid_sd(image):
     new_mask = np.where(unmasked_perc < 0.5, 1, new_mask)
     result_img = np.ma.masked_where(new_mask, result_img)
     return result_img
+
+def relative_brightness(bandA):
+    brightness = min_max_scale(bandA)
+    return brightness, "C-B"
+
 def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     #TODO For each channel, create a mask in range [0, 1] indicating likelihood of being background
 
@@ -513,7 +518,7 @@ def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     edge_mask[-5:, :] = 1
 
     #1. Brightness relative to the rest of the image
-    brightness = min_max_scale(bandA)
+    darkness = relative_darkness(bandA)
     #show(bandA)
 
     #2. Rough AA - Shifted based on value at flank and then capped at range [0, 1]
@@ -581,7 +586,6 @@ def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     c = 1
     d = 1
 
-    darkness = np.ones_like(brightness) - brightness
     t = a * darkness + b * ratio + c * mvmt_above_noise + d * AA_sd
     ts = cross_bilateral_filter_fast(t, bandA, sigma_s=10, sigma_r=20, sa_s=5, sa_r=10)
 
@@ -606,5 +610,5 @@ def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     #Smekens repeated fitting mask
     #Input into morph transform/bilateral filter/ML model
 
-    return np.ones_like(bandA), "CC"
+    return darkness, "CC"
 

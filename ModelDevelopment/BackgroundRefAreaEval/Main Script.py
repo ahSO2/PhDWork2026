@@ -15,8 +15,8 @@ import VolcDictionaryWithCorrectClears
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Kilauea"]
 filter_for_quality = "Good"
-set_to_consider = "Train"
-mod = 10
+set_to_consider = "UnseenTest"
+mod = 5
 timesteps = ["image_name", "next_tensec_name"]
 save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
@@ -38,7 +38,7 @@ for llo in locations: #Leaving out one location at a time
     metrics_df = pd.DataFrame(columns=columns)
 
     print("Running tests on " + llo + "-left-out CV Fold.")
-    samples_df = pd.read_excel(paths_dictionary["df_path"] + llo + "LeftOut_" + set_to_consider + ".xlsx")
+    samples_df = pd.read_excel(paths_dictionary["df_path"] + llo + "_" + set_to_consider + ".xlsx")
 
     if filter_for_quality == "Good":
         samples_df = samples_df[samples_df["overall_obs"] == "No"]
@@ -64,14 +64,15 @@ for llo in locations: #Leaving out one location at a time
         #Calculate the reference areas with the chosen method
         #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=False)
         #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
-        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=True, output="both")
+        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
         #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
         #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=True)
-        ref_areas, method_name = custom_combined(sequence[0], sequence_B[0], sequence[1], sequence_B[1], flank_mask, plot=True)
+        #ref_areas, method_name = custom_combined(sequence[0], sequence_B[0], sequence[1], sequence_B[1], flank_mask, plot=True)
+        ref_areas, method_name = relative_brightness(sequence[0])
 
-        if sample_index < 1000: #Plot the timesteps and masks
+        if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
             axs[0,0].set_title("310nm Frame 1", fontsize=10)
@@ -96,7 +97,7 @@ for llo in locations: #Leaving out one location at a time
         ref_areas = np.where(flank_mask == 1, ref_areas, 0)
         ground_truth_bg = np.where(plume_mask == 0, flank_mask, 0)
 
-        if sample_index < 0: #Plot the selected background regions
+        if sample_index < 1000: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
             axs[1,0].imshow(sequence_B[0], cmap="gray")
@@ -106,12 +107,18 @@ for llo in locations: #Leaving out one location at a time
             axs[1,2].imshow(ref_areas, cmap="gray")
             plt.show()
 
-        TP, TN, FP, FN = calculate_conf_counts(ref_areas, ground_truth_bg)
+        to_exclude = np.where(flank_mask > 0, 0, 1) + np.where(sequence_B[0] == 0, 1, 0)
+        to_exclude = np.where(to_exclude>0, 1, 0)
+        auc_pr = AUC_PR(ref_areas, ground_truth_bg, exclude=to_exclude, plot=True)
+
+        #TODO These counts are only valid if ref_areas is a binary mask
+        TP, TN, FP, FN = calculate_conf_counts(ref_areas, ground_truth_bg, exclude=np.where(flank_mask > 0, 0, 1))
         PP, PN = per_class_precision(TP, TN, FP, FN)
         RP, RN = per_class_recall(TP, TN, FP, FN)
         IOU = intersection_over_union(TP, TN, FP, FN)
         F1 = F1_score(PP, RP)
         VR = variance_ratio(sequence[0], sequence_B[0], ref_areas, ground_truth_bg, flank_mask)
+
 
         new_row = {"image_name": names[0],
                    "volcano_name": samples_df["volcano_name"][sample_index],
