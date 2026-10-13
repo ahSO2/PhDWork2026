@@ -1,3 +1,5 @@
+import copy
+
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,8 +36,8 @@ def calculate_conf_counts(predicted_mask, true_mask, exclude):
     false_n_mask = np.where(exclude == 1, 0, false_n_mask)
     FN = np.sum(false_n_mask)
 
-    total = true_n_mask + 2*false_n_mask + 3*false_p_mask + 4*true_p_mask
-    show(total)
+    #total = true_n_mask + 2*false_n_mask + 3*false_p_mask + 4*true_p_mask
+    #show(total)
 
     return TP, TN, FP, FN
 
@@ -152,7 +154,7 @@ def variance_ratio(bandA, bandB, selected_ref_area, manual_ref_area, flank_mask)
     edge_mask[-5:, :] = 1
     edge_mask = edge_mask + inv_flank_mask
 
-    bandA_copy = bandA.copy()
+    bandA_copy = copy.deepcopy(bandA)
     bandA_copy = np.ma.masked_where(edge_mask>0, bandA_copy)
 
     # Then calculate the absorbance (without accounting for backgrounds)
@@ -181,23 +183,87 @@ def variance_ratio(bandA, bandB, selected_ref_area, manual_ref_area, flank_mask)
     else:
         return min(selected_sd/gt_sd, 1) #Return the proportion of the standard deviation that is represented (1 if the ref area gives an accurate or an overestimation of the background veriability)
 
-def AUC_PR(predictions, ground_truth, exclude, plot=False):
+def find_recall_at_precision_level(recalls, precisions, precision_level):
+    '''Return the highest recall obtained when precision is greater than
+    the given value.'''
+
+    rel_indexes = [i for i in range(len(recalls)) if precisions[i] > precision_level]
+    rel_recalls = [recalls[ri] for ri in rel_indexes]
+    print("Max recall at precision " + str(precision_level)  + " is " + str(max(rel_recalls)))
+    return max(rel_recalls)
+
+def find_precision_at_recall_level(recalls, precisions, recall_level):
+    '''Return the highest precision obtained for thresholds at which recall
+    is greater than the specified value.'''
+
+    rel_indexes = [i for i in range(len(recalls)) if recalls[i] > recall_level]
+    rel_precisions = [precisions[ri] for ri in rel_indexes]
+    #print("Max precision at recall " + str(recall_level) + " is " + str(max(rel_precisions)))
+    return max(rel_precisions)
+def AUC_PR(predictions, ground_truth, flank_mask, exclude_edges, bandB, plot=False):
     '''Mask out any pixels which are already masked, plus any indicated with a
-    1 in "exclude".'''
+    0 in flank-mask, or 0 in bandB.'''
 
-    #TODO Mask out pixels in exclude mask
-    gt = np.ma.masked_where(exclude, ground_truth)
-    pr = np.ma.masked_where(exclude, predictions)
+    #print(np.nansum(ground_truth))
 
-    precisions, recalls, thresholds = precision_recall_curve(y_true=gt.compressed(), y_score=pr.compressed())
-    auc_val = auc(recalls, precisions)
+    if np.nansum(ground_truth) == 0:
+        #If the true mask is zero, then set AUC and recall-at-precision values to undefined
+        return np.nan, np.nan, np.nan, np.nan, np.nan
 
-    if plot == True:
-        cm = 1 / 2.54  # centimeters in inches
-        fig, ax = plt.subplots(figsize=(18 * cm, 18 * cm))
-        ax.plot(recalls, precisions)
-        ax.set_xlabel("Recall", fontsize=14)
-        ax.set_ylabel("Precision", fontsize=14)
-        plt.show()
+    else:
+        #show(np.where(ground_truth>0, 10, 0), colormap="YlGnBu")
+        p = copy.deepcopy(predictions)
+        gt = copy.deepcopy(ground_truth)
 
-    return auc_val
+        to_mask = np.where(flank_mask == 0, 1, 0)
+
+        bandB_zero_mask = np.where(bandB == 0, 5, 0)
+        edge_mask = cv2.blur(bandB_zero_mask, (5, 5))
+        edge_mask[:, 0:6] = 1
+        edge_mask[:, -5:] = 1
+        edge_mask[0:6, :] = 1
+        edge_mask[-5:, :] = 1
+        to_mask += edge_mask
+
+        if np.ma.isMaskedArray(p):
+            p.mask = np.where(to_mask + p.mask > 0, 1, 0)
+        else:
+            p = np.ma.masked_where(to_mask > 0, p)
+        if np.ma.isMaskedArray(gt):
+            gt.mask = np.where(gt.mask + to_mask > 0, 1, 0)
+        else:
+            gt = np.ma.masked_where(to_mask > 0, gt)
+
+        if plot == True:
+            fig, axs = plt.subplots(ncols=2)
+            axs[0].imshow(p, cmap="gray")
+            axs[1].imshow(gt, cmap="gray")
+            plt.show()
+
+        precisions, recalls, thresholds = precision_recall_curve(y_true=gt.compressed(), y_score=p.compressed())
+        auc_val = auc(recalls, precisions)
+        #print(auc_val)
+
+        r_99 = find_recall_at_precision_level(recalls, precisions, precision_level=0.99)
+        r_95 = find_recall_at_precision_level(recalls, precisions, precision_level=0.95)
+        r_90 = find_recall_at_precision_level(recalls, precisions, precision_level=0.90)
+        p_99 = find_precision_at_recall_level(recalls, precisions, recall_level=0.99)
+
+        if plot==True:
+            #cm = 1 / 2.54  # centimeters in inches
+            #fig, ax = plt.subplots(figsize=(18 * cm, 18 * cm))
+            #ax.plot(recalls, precisions)
+            #ax.set_xlabel("Recall", fontsize=14)
+            #ax.set_ylabel("Precision", fontsize=14)
+            #plt.show()
+
+            cm = 1 / 2.54  # centimeters in inches
+            fig, ax = plt.subplots(figsize=(18 * cm, 18 * cm))
+            ax.plot(thresholds, precisions[:-1], label="precision")
+            ax.plot(thresholds, recalls[:-1], label="recall")
+            ax.set_xlabel("Threshold", fontsize=14)
+            ax.set_ylabel("Precision/Recall", fontsize=14)
+            plt.legend(fontsize=14)
+            plt.show()
+
+    return auc_val, r_99, r_95, r_90, p_99

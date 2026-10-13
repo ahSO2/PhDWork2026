@@ -1,4 +1,5 @@
 import cv2
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pyplis
@@ -8,37 +9,8 @@ from skimage.morphology import disk
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 from FastBilateral import *
-
-def min_max_scale(img):
-    '''Scale image to range [0, 1], considering only unmasked pixels.'''
-    img_min = np.ma.min(img)
-    img_max = np.ma.max(img)
-    scaled_img = (img - img_min)/(img_max-img_min)
-    return scaled_img
-def calc_bin_thresh(image, plot=False):
-    '''Return a threshold for the image pixels based on the histogram bin
-    containing the most common values.'''
-
-    n_bins = 10
-    if np.ma.is_masked(image):
-        values = image.compressed()
-    else:
-        values = image.flatten()
-
-    counts, bins = np.histogram(values, n_bins, [np.nanmin(values), np.nanmax(values)])
-    bin_length = np.abs(np.nanmax(values) - np.nanmin(values)) / n_bins
-
-    max_bin_index = np.argmax(counts) #Index of tallest bin (starting from 0)
-    rhs_boundary = bins[max_bin_index + 1]
-
-    if plot == True:
-        bin_centers = np.linspace(bin_length / 2, bin_length * (n_bins - 1 + 0.5), n_bins)
-        plt.stairs(counts, bins)
-        plt.scatter(bin_centers, np.ones_like(bin_centers))
-        plt.axvline(x=rhs_boundary)
-        plt.show()
-
-    return rhs_boundary
+from ScalingFunctions import min_max_scale, scale_by_percentile, hist_max_thresh
+from RefAreaActivationFunctions import relative_brightness
 
 def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
     '''A function to allow easy implementation of thresholding on channels
@@ -156,7 +128,7 @@ def delledonne_min_ratio(bandA, bandB, plot=False):
         #plt.colorbar()
         #plt.show()
 
-        img_to_show = ratio.copy()
+        img_to_show = copy.deepcopy(ratio)
         img_to_show = cv2.rectangle(img_to_show, (tl[1], tl[0]), (br[1], br[0]), color=100)
         img_to_show = np.where(circle_mask == 1, circle_mean_value, img_to_show)
         img_to_show = cv2.circle(img_to_show, center=(min_index[1], min_index[0]), radius=circle_radius, color=100)
@@ -176,7 +148,7 @@ def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
 
     #Calculate bandA/bandB, masking out edges where bandB is zero or has
     #weird values introduced by the registration transformation
-    bandA_copy = np.ma.masked_where(bandB == 0, bandA.copy())
+    bandA_copy = np.ma.masked_where(bandB == 0, copy.deepcopy(bandA))
     ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
     ratio = np.ma.masked_where(bandA_copy.mask, bandA_copy)
 
@@ -222,7 +194,7 @@ def kern_low_texture_and_ratio(bandA, bandB, flank_mask, plot=False):
     #Calculate the absorbance ignoring backgrounds
     #First mask out the edges which cause artifical high absorbance values,
     #Masking out the flank at the same time
-    bandA_copy = bandA.copy()
+    bandA_copy = copy.deepcopy(bandA)
     edge_mask = np.where(bandB==0, 0, 5)
     edge_mask = cv2.blur(edge_mask, (5, 5))
     edge_mask = np.where(flank_mask == 0, 0, edge_mask)
@@ -402,7 +374,7 @@ def smekens_repeated_fitting(bandA, flank_mask, plot=False):
     '''Identify sky reference areas by repeatedly fitting a 2nd degree 2D polynomial to the
     sky pixels, and excluding any pixels which are not well represented. '''
 
-    sky_mask = flank_mask.copy() #Mask indicating pixels thought to be clear sky with 1s
+    sky_mask = copy.deepcopy(flank_mask) #Mask indicating pixels thought to be clear sky with 1s
 
     #I have omitted the edge mask used by Smekens et al. because we have
     #clear-corrected the images (and I think the placement of the lens/filter
@@ -418,7 +390,7 @@ def smekens_repeated_fitting(bandA, flank_mask, plot=False):
 
         #Exclude pixels with transmittance outwith (0.97, 1.03) from the
         #identified sky reference area mask
-        prev_sky_mask = sky_mask.copy()
+        prev_sky_mask = copy.deepcopy(sky_mask.copy)
         sky_mask = np.where(transmittance >= 1.03, 0, sky_mask)
         sky_mask = np.where(transmittance <= 0.97, 0, sky_mask)
 
@@ -452,25 +424,7 @@ def rough_AA(bandA, bandB, edge_mask):
     ratio = -1 * np.ma.log(ratio)
     return ratio
 
-def scale_by_percentile(img1, img2, p):
-    '''Scale either image using the 95th percentile values.'''
-    if np.ma.is_masked(img1):
-        img1_values = img1.compressed()
-        img2_values = img2.compressed()
-    else:
-        img1_values = img1.flatten()
-        img2_values = img2.flatten()
-    p95_1 = np.percentile(img1_values, p)
-    p95_2 = np.percentile(img2_values, p)
 
-    if p95_1 > p95_2:
-        scale_factor = p95_1/p95_2
-        scaled_2 = img2.astype(np.float32) * scale_factor
-        return img1.astype(np.float32), scaled_2
-    else:
-        scale_factor = p95_2/p95_1
-        scaled_1 = img1.astype(np.float32) * scale_factor
-        return scaled_1, img2.astype(np.float32)
 
 def grid_sd(image):
     '''Return a gridded image showing the standard deviation in each rectangle
@@ -503,9 +457,6 @@ def grid_sd(image):
     result_img = np.ma.masked_where(new_mask, result_img)
     return result_img
 
-def relative_brightness(bandA):
-    brightness = min_max_scale(bandA)
-    return brightness, "C-B"
 
 def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     #TODO For each channel, create a mask in range [0, 1] indicating likelihood of being background

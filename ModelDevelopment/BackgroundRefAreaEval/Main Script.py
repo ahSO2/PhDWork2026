@@ -61,16 +61,24 @@ for llo in locations: #Leaving out one location at a time
         smoothed_flank_mask = cv2.blur(flank_mask * 5, (20, 20))
         flank_mask = np.where(smoothed_flank_mask < 5, 0, 1)
 
+        '''Each method may include its own masking of pixels e.g. when absorbance is 
+        calculated. The flank is masked out of the selected ref-areas below, incase this
+        hasn't been done already in the method. '''
+
         #Calculate the reference areas with the chosen method
         #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=False)
-        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
+        ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
         #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
         #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
         #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=True)
         #ref_areas, method_name = custom_combined(sequence[0], sequence_B[0], sequence[1], sequence_B[1], flank_mask, plot=True)
-        ref_areas, method_name = relative_brightness(sequence[0])
+
+        #Methods which instead return an activation
+        ref_activ, method_name = relative_brightness(sequence[0])
+        ref_activ = np.where(flank_mask==1, ref_activ, 0)
+        ref_areas = np.zeros_like(ref_activ)
 
         if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -97,7 +105,10 @@ for llo in locations: #Leaving out one location at a time
         ref_areas = np.where(flank_mask == 1, ref_areas, 0)
         ground_truth_bg = np.where(plume_mask == 0, flank_mask, 0)
 
-        if sample_index < 1000: #Plot the selected background regions
+        auc_pr = AUC_PR(ref_activ, ground_truth_bg, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
+                        plot=True)
+
+        if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
             axs[1,0].imshow(sequence_B[0], cmap="gray")
@@ -106,10 +117,6 @@ for llo in locations: #Leaving out one location at a time
             axs[0,2].imshow(ground_truth_bg, cmap="gray")
             axs[1,2].imshow(ref_areas, cmap="gray")
             plt.show()
-
-        to_exclude = np.where(flank_mask > 0, 0, 1) + np.where(sequence_B[0] == 0, 1, 0)
-        to_exclude = np.where(to_exclude>0, 1, 0)
-        auc_pr = AUC_PR(ref_areas, ground_truth_bg, exclude=to_exclude, plot=True)
 
         #TODO These counts are only valid if ref_areas is a binary mask
         TP, TN, FP, FN = calculate_conf_counts(ref_areas, ground_truth_bg, exclude=np.where(flank_mask > 0, 0, 1))
