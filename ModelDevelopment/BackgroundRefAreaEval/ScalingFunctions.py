@@ -8,6 +8,18 @@ def min_max_scale(img):
     scaled_img = (img - img_min)/(img_max-img_min)
     return scaled_img
 
+def min_max_percentile(img, p):
+    '''Scale such that the 0 to p-th percentile values are in range [0-1].
+    Considering only unmasked pixels.'''
+    if np.ma.is_masked(img):
+        img_values = img.compressed()
+    else:
+        img_values = img.flatten()
+    perc = np.percentile(img_values, p)
+    img_min = np.min(img_values)
+    scaled_img = img - img_min / (perc- img_min)
+    return scaled_img
+
 def scale_by_percentile(img1, img2, p):
     '''Scale either image using the 95th percentile values.'''
     if np.ma.is_masked(img1):
@@ -18,6 +30,8 @@ def scale_by_percentile(img1, img2, p):
         img2_values = img2.flatten()
     p95_1 = np.percentile(img1_values, p)
     p95_2 = np.percentile(img2_values, p)
+    print(p95_1)
+    print(p95_2)
 
     if p95_1 > p95_2:
         scale_factor = p95_1/p95_2

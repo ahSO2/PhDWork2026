@@ -515,7 +515,7 @@ def custom_combined(bandA, bandB, ts_bandA, ts_bandB, flank_mask, plot=False):
     og_ratio = rough_AA(bandA, bandB, edge_mask)
     ts_ratio = rough_AA(ts_bandA, ts_bandB, edge_mask)
     scaled_og, scaled_ts = scale_by_percentile(og_ratio, ts_ratio, 5)
-    AA_diff = np.abs(ratio - ts_ratio)
+    AA_diff = np.abs(og_ratio - ts_ratio)
     AA_diff = np.where(AA_diff > 1, 1, AA_diff)
     AA_diff = np.where(AA_diff < 0, 0, AA_diff)
     #show(AA_diff, colormap="YlGnBu_r", title="AA time difference")

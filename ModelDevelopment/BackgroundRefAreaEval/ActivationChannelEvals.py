@@ -14,13 +14,13 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Merapi"]
+#locations = ["Kilauea"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 17
+mod = 1
 timesteps = ["image_name", "next_tensec_name"]
 to_predict = "Background"
-save_results = False
+save_results = True
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
@@ -72,13 +72,43 @@ for llo in locations: #Leaving out one location at a time
         calculated. The flank is masked out of the selected ref-areas below, incase this
         hasn't been done already in the method. '''
 
+        bandB_zero = np.where(sequence_B[0] == 0, 5, 0)
+        edge_mask = cv2.blur(bandB_zero, (11, 11))
+        edge_mask[:, 0:6] = 1
+        edge_mask[:, -5:] = 1
+        edge_mask[0:6, :] = 1
+        edge_mask[-5:, :] = 1
+        to_mask = np.where(flank_mask == 0, 1, 0) + edge_mask
+
         #Methods which instead return an activation
-        #ref_activ, method_name = relative_brightness(sequence[0])
+        brightness, method_name = relative_brightness(sequence[0])
         #ref_activ, method_name = relative_darkness(sequence[0])
-        #ref_activ, method_name = inv_relative_absorbance(sequence[0], sequence_B[0], flank_mask)
-        #ref_activ, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
+        #inv_absorbance, method_name = inv_relative_absorbance(sequence[0], sequence_B[0], flank_mask)
+        absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
         #ref_activ, method_name = inv_diff_mvmt(sequence[0], sequence[1])
-        ref_activ, method_name = mvmt_below_noise(sequence[0], sequence[1], flank_mask)
+        movement, method_name = mvmt_above_noise(sequence[0], sequence[1], flank_mask)
+        #ref_activ, method_name = diff_mvmt(sequence[0], sequence[1])
+        abs_diff, method_name = rel_abs_temp_diff(sequence[0], sequence_B[0], sequence[1], sequence_B[1])
+        #show(movement)
+
+        abs_activ_1 = absorbance
+        abs_activ_1 = np.ma.masked_where(to_mask > 0, abs_activ_1)
+        abs_activ_1 = function_over_grid(abs_activ_1, grid_size=50, function="var", nan_fill=0, min_box_prop=0.95,
+                                       plot=False)
+
+        abs_activ_2 = abs_diff
+        abs_activ_2 = np.ma.masked_where(to_mask > 0, abs_activ_2)
+        abs_activ_2 = function_over_grid(abs_activ_2, grid_size=50, function="var", nan_fill=0, min_box_prop=0.95, plot=False)
+
+
+        ref_activ = brightness - absorbance - 0.25 * movement - 5 * abs_activ_1 - 20 * abs_activ_2
+        ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
+        ref_activ = function_over_grid(ref_activ, grid_size=50, function="mean", nan_fill=0, min_box_prop=0.75, plot=False)
+        method_name = "C-6"
+        #fig, axs = plt.subplots(ncols=2)
+        #axs[0].imshow(inv_absorbance, cmap="gray")
+        #axs[1].imshow(ref_activ, cmap="gray")
+        #plt.show()
         #show(ref_activ)
 
         if sample_index < 0: #Plot the timesteps and masks
@@ -110,11 +140,13 @@ for llo in locations: #Leaving out one location at a time
             ground_truth = ground_truth_plume
         else:
             ground_truth = ground_truth_bg
-        #show(ground_truth_bg)
-        ref_activ = np.where(flank_mask == 1, ref_activ, 0)
 
+        if to_predict == "Background": #If we are trying to recall background, return AUC values of nan for cases with only a very small number of (probably erroneous) background pixels
+            min_true_pos = 600
+        else:
+            min_true_pos = 1
         auc_pr, r_ap99, r_ap95, r_ap90, p_ar99 = AUC_PR(ref_activ, ground_truth, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
-                        plot=True)
+                        plot=False, min_true_pos=min_true_pos)
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)

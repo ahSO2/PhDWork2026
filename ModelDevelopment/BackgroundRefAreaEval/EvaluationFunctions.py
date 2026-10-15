@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_recall_curve, auc
+from ScalingFunctions import min_max_scale
 
 def show(image, colormap="gray", title="None"):
     plt.imshow(image, cmap=colormap)
@@ -200,25 +201,26 @@ def find_precision_at_recall_level(recalls, precisions, recall_level):
     rel_precisions = [precisions[ri] for ri in rel_indexes]
     #print("Max precision at recall " + str(recall_level) + " is " + str(max(rel_precisions)))
     return max(rel_precisions)
-def AUC_PR(predictions, ground_truth, flank_mask, exclude_edges, bandB, plot=False):
+def AUC_PR(predictions, ground_truth, flank_mask, exclude_edges, bandB, plot=False, min_true_pos = 1):
     '''Mask out any pixels which are already masked, plus any indicated with a
     0 in flank-mask, or 0 in bandB.'''
 
     #print(np.nansum(ground_truth))
 
-    if np.nansum(ground_truth) == 0:
+    if np.nansum(ground_truth) < min_true_pos:
+        show(ground_truth)
         #If the true mask is zero, then set AUC and recall-at-precision values to undefined
         return np.nan, np.nan, np.nan, np.nan, np.nan
 
     else:
-        #show(np.where(ground_truth>0, 10, 0), colormap="YlGnBu")
         p = copy.deepcopy(predictions)
+
         gt = copy.deepcopy(ground_truth)
 
         to_mask = np.where(flank_mask == 0, 1, 0)
 
         bandB_zero_mask = np.where(bandB == 0, 5, 0)
-        edge_mask = cv2.blur(bandB_zero_mask, (5, 5))
+        edge_mask = cv2.blur(bandB_zero_mask, (11, 11))
         edge_mask[:, 0:6] = 1
         edge_mask[:, -5:] = 1
         edge_mask[0:6, :] = 1
@@ -226,13 +228,12 @@ def AUC_PR(predictions, ground_truth, flank_mask, exclude_edges, bandB, plot=Fal
         to_mask += edge_mask
 
         if np.ma.isMaskedArray(p):
-            p.mask = np.where(to_mask + p.mask > 0, 1, 0)
-        else:
-            p = np.ma.masked_where(to_mask > 0, p)
+            to_mask += p.mask.astype(np.uint8)
         if np.ma.isMaskedArray(gt):
-            gt.mask = np.where(gt.mask + to_mask > 0, 1, 0)
-        else:
-            gt = np.ma.masked_where(to_mask > 0, gt)
+            to_mask += gt.mask.astype(np.uint8)
+
+        p = np.ma.masked_where(to_mask > 0, p)
+        gt = np.ma.masked_where(to_mask > 0, gt)
 
         if plot == True:
             fig, axs = plt.subplots(ncols=2)
@@ -267,3 +268,43 @@ def AUC_PR(predictions, ground_truth, flank_mask, exclude_edges, bandB, plot=Fal
             plt.show()
 
     return auc_val, r_99, r_95, r_90, p_99
+
+def activation_ratio(predictions, plume_mask, flank_mask, bandB):
+    '''Scale the activation function (indicating background) to range[0,1].
+    Take the inverse.
+    Take the ratio of the mean value in the plume vs. the background.'''
+
+    bandB_zero_mask = np.where(bandB == 0, 5, 0)
+    edge_mask = cv2.blur(bandB_zero_mask, (5, 5))
+    edge_mask[:, 0:6] = 1
+    edge_mask[:, -5:] = 1
+    edge_mask[0:6, :] = 1
+    edge_mask[-5:, :] = 1
+
+    to_mask = edge_mask + np.where(flank_mask == 0, 1, 0)
+
+    p_bg = np.ma.masked_where(to_mask, predictions)
+
+    #Scale to [0, 1]
+    p_bg = min_max_scale(p_bg)
+    #Invert
+    ac = np.ones_like(p_bg) - p_bg
+
+    #Activations for plume pixels
+    mask_out_sky = to_mask + np.where(plume_mask == 0, 1, 0)
+    ac_pl = np.ma.masked_where(mask_out_sky > 0, ac)
+
+    #Activations for sky pixels
+    mask_out_plume = to_mask + plume_mask
+    ac_sk = np.ma.masked_where(mask_out_plume > 0, ac)
+
+    if 1 == 1:
+        fig, axs = plt.subplots(ncols=2)
+        axs[0].imshow(ac_pl, vmax=1, vmin=0)
+        axs[1].imshow(ac_sk, vmax=1, vmin=0)
+        plt.show()
+
+    if np.ma.median(ac_sk) != 0:
+        ac_ratio = np.ma.median(ac_pl)/np.ma.median(ac_sk)
+    else:
+        pass
