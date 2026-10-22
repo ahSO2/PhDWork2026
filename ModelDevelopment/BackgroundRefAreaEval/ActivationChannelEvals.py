@@ -17,10 +17,10 @@ locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Kilauea"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 1
-timesteps = ["image_name", "next_tensec_name"]
+mod = 25
+timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 to_predict = "Background"
-save_results = True
+save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
@@ -59,18 +59,13 @@ for llo in locations: #Leaving out one location at a time
         sequence, names, plume_mask, flank_mask = read_sample(sample_index, samples_df, timesteps, "A", volc_dictionary, paths_dictionary)
         sequence_B, names_B, NA, flank_mask = read_sample(sample_index, samples_df, timesteps, "B", volc_dictionary, paths_dictionary)
 
-        #Blur my drawn flank masks slightly to ensure all flank pixels are excluded
-        smoothed_flank_mask = cv2.blur(flank_mask * 5, (20, 20))
-        flank_mask = np.where(smoothed_flank_mask < 5, 0, 1)
-
-        #if np.sum(plume_mask) < 1000:
-        #    if np.sum(plume_mask > 0):
-        #        show(plume_mask)
-        #        show(np.where(flank_mask == 0, 0, plume_mask))
-
         '''Each method may include its own masking of pixels e.g. when absorbance is 
         calculated. The flank is masked out of the selected ref-areas below, incase this
         hasn't been done already in the method. '''
+
+        #Blur my drawn flank masks slightly to ensure all flank pixels are excluded
+        smoothed_flank_mask = cv2.blur(flank_mask * 5, (20, 20))
+        flank_mask = np.where(smoothed_flank_mask < 5, 0, 1)
 
         bandB_zero = np.where(sequence_B[0] == 0, 5, 0)
         edge_mask = cv2.blur(bandB_zero, (11, 11))
@@ -81,33 +76,53 @@ for llo in locations: #Leaving out one location at a time
         to_mask = np.where(flank_mask == 0, 1, 0) + edge_mask
 
         #Methods which instead return an activation
-        brightness, method_name = relative_brightness(sequence[0])
+        #brightness, method_name = relative_brightness(sequence[0])
+        #scaled_brightness, method_name = relative_brightness_99p(sequence[0])
         #ref_activ, method_name = relative_darkness(sequence[0])
         #inv_absorbance, method_name = inv_relative_absorbance(sequence[0], sequence_B[0], flank_mask)
-        absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
+        #absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
         #ref_activ, method_name = inv_diff_mvmt(sequence[0], sequence[1])
-        movement, method_name = mvmt_above_noise(sequence[0], sequence[1], flank_mask)
-        #ref_activ, method_name = diff_mvmt(sequence[0], sequence[1])
-        abs_diff, method_name = rel_abs_temp_diff(sequence[0], sequence_B[0], sequence[1], sequence_B[1])
-        #show(movement)
+        #movement, method_name = mvmt_above_noise(sequence[0], sequence[1], sequence[2], flank_mask)
+        #ref_activ, method_name = diff_mvmt(sequence[0], sequence[1], sequence[2])
+        abs_diff, method_name = rel_abs_temp_diff(sequence, sequence_B, edge_mask)
 
-        abs_activ_1 = absorbance
-        abs_activ_1 = np.ma.masked_where(to_mask > 0, abs_activ_1)
-        abs_activ_1 = function_over_grid(abs_activ_1, grid_size=50, function="var", nan_fill=0, min_box_prop=0.95,
-                                       plot=False)
+
+        #abs_activ_1 = absorbance
+        #abs_activ_1 = np.ma.masked_where(to_mask > 0, abs_activ_1)
+        #abs_activ_1 = function_over_grid(abs_activ_1, grid_size=50, function="var", nan_fill=0, min_box_prop=0.95,
+        #                               plot=True)
+        #abs_activ_1 = np.ma.sqrt(abs_activ_1)
 
         abs_activ_2 = abs_diff
+        #show(abs_diff)
         abs_activ_2 = np.ma.masked_where(to_mask > 0, abs_activ_2)
-        abs_activ_2 = function_over_grid(abs_activ_2, grid_size=50, function="var", nan_fill=0, min_box_prop=0.95, plot=False)
+        abs_activ_2 = function_over_grid(abs_activ_2, grid_size=100, function="var", nan_fill=0, min_box_prop=0.95, plot=True)
+        abs_activ_2 = np.sqrt(abs_activ_2)
+        #show(abs_activ_2)
 
+        #### Combine the channels to form the activation
+        ref_activ = abs_activ_2
+        #ref_activ = brightness - absorbance - 0.25 * movement - 5 * abs_activ_1 - 20 * abs_activ_2
+        #ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
 
-        ref_activ = brightness - absorbance - 0.25 * movement - 5 * abs_activ_1 - 20 * abs_activ_2
-        ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
-        ref_activ = function_over_grid(ref_activ, grid_size=50, function="mean", nan_fill=0, min_box_prop=0.75, plot=False)
-        method_name = "C-6"
+        #### Apply gap-filling/smoothing
+        #ref_activ = function_over_grid(ref_activ, grid_size=50, function="mean", nan_fill=0, min_box_prop=0.75, plot=False)
+        #show(ref_activ, colormap="gray")
+
+        #ref_activ = ws(ref_activ, plot=True)
+        method_name = "C-7"
+
+        #to_superpixel = np.where(flank_mask > 0, brightness, 0)
+        #to_superpixel = min_max_scale(to_superpixel)
+        #sp = superpixels(to_superpixel, to_superpixel, to_superpixel, k=30, comp=7, plot=True)
+
+        #show(brightness)
+        #ref_smoothed = cross_bilateral_filter_fast(image=ref_activ, ref_img=brightness * 100, sigma_s=25, sigma_r=10, sa_s=10, sa_r=4)
         #fig, axs = plt.subplots(ncols=2)
-        #axs[0].imshow(inv_absorbance, cmap="gray")
-        #axs[1].imshow(ref_activ, cmap="gray")
+        #axs[0].imshow(ref_activ, cmap="gray")
+        #axs[1].imshow(ref_smoothed, cmap="gray", vmax=np.max(ref_activ), vmin=np.min(ref_activ))
+        #axs[0].set_axis_off()
+        #axs[1].set_axis_off()
         #plt.show()
         #show(ref_activ)
 
@@ -150,10 +165,10 @@ for llo in locations: #Leaving out one location at a time
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
-            axs[0,0].imshow(sequence[0], cmap="gray")
-            axs[1,0].imshow(sequence_B[0], cmap="gray")
-            axs[0,1].imshow(sequence[1], cmap="gray")
-            axs[1,1].imshow(sequence_B[1], cmap="gray")
+            axs[0,0].imshow(brightness, cmap="gray")
+            axs[1,0].imshow(absorbance, cmap="gray")
+            axs[0,1].imshow(movement, cmap="gray")
+            axs[1,1].imshow(abs_activ_1, cmap="gray")
             axs[0,2].imshow(ground_truth, cmap="gray")
             axs[1,2].imshow(ref_activ, cmap="gray")
             plt.show()

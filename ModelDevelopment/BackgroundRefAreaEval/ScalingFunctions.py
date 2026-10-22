@@ -8,6 +8,10 @@ def min_max_scale(img):
     scaled_img = (img - img_min)/(img_max-img_min)
     return scaled_img
 
+def scale_values_to_01(lower, upper, img):
+    scaled_img = (img - lower) / (upper - lower)
+    return scaled_img
+
 def min_max_percentile(img, p):
     '''Scale such that the 0 to p-th percentile values are in range [0-1].
     Considering only unmasked pixels.'''
@@ -17,7 +21,7 @@ def min_max_percentile(img, p):
         img_values = img.flatten()
     perc = np.percentile(img_values, p)
     img_min = np.min(img_values)
-    scaled_img = img - img_min / (perc- img_min)
+    scaled_img = (img - img_min) / (perc - img_min)
     return scaled_img
 
 def scale_by_percentile(img1, img2, p):

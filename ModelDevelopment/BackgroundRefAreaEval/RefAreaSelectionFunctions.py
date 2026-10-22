@@ -10,6 +10,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 from FastBilateral import *
 from ScalingFunctions import min_max_scale, scale_by_percentile, hist_max_thresh
+from Show import show
 from RefAreaActivationFunctions import relative_brightness
 
 def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
@@ -408,15 +409,6 @@ def smekens_repeated_fitting(bandA, flank_mask, plot=False):
                 axs[2].set_title("Polyfit sky estimation")
                 plt.show()
     return sky_mask, "S-RF"
-
-def show(image, colormap="gray", title="None"):
-    plt.imshow(image, cmap=colormap)
-    if "None" in title:
-        pass
-    else:
-        plt.title(title)
-    plt.colorbar()
-    plt.show()
 
 def rough_AA(bandA, bandB, edge_mask):
     bandA_copy = np.ma.masked_where(edge_mask > 0, bandA)

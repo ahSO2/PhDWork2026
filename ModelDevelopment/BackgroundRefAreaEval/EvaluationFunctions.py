@@ -6,15 +6,8 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_recall_curve, auc
 from ScalingFunctions import min_max_scale
+from Show import show
 
-def show(image, colormap="gray", title="None"):
-    plt.imshow(image, cmap=colormap)
-    if "None" in title:
-        pass
-    else:
-        plt.title(title)
-    plt.colorbar()
-    plt.show()
 
 def calculate_conf_counts(predicted_mask, true_mask, exclude):
     '''The positive (clear-sky) pixels in each mask should be indicated by 1s.

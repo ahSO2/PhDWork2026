@@ -1,24 +1,34 @@
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from skimage import filters
+from skimage.segmentation import felzenszwalb, slic
+from skimage.segmentation import mark_boundaries
+from skimage.segmentation import watershed
 
-from ScalingFunctions import min_max_scale, scale_by_percentile, hist_max_thresh, min_max_percentile
+from ScalingFunctions import min_max_scale, scale_values_to_01, scale_by_percentile, hist_max_thresh, min_max_percentile
+from Show import show
 
 '''These functions output a numerical measure on the likely distribution
 of plume or background in the image, rather than a binary mask.'''
 
-def show(image, colormap="gray", title="None"):
-    plt.imshow(image, cmap=colormap)
-    if "None" in title:
-        pass
-    else:
-        plt.title(title)
-    plt.colorbar()
-    plt.show()
 
 def relative_brightness(bandA):
     brightness = min_max_scale(bandA)
     return brightness, "C-B"
+
+def relative_brightness_99p(bandA):
+    '''Min-max scale the image using the 1st and 99th percentile values, then threshold
+    all pixels to range [0, 1]. For the purpose of making the channel more robust to
+    small outiler values.'''
+
+    upper = np.percentile(bandA.flatten(), 99)
+    lower = np.percentile(bandA.flatten(), 1)
+    scaled = scale_values_to_01(lower, upper, bandA)
+    scaled = np.where(scaled > 1, 1, scaled)
+    scaled = np.where(scaled < 0, 0, scaled)
+    show(scaled, title="Scaled to [0, 1]")
+    return scaled, "C-BS"
 
 def relative_darkness(bandA):
     darkness = np.ones_like(bandA) - relative_brightness(bandA)[0]
@@ -53,7 +63,7 @@ def relative_absorbance(bandA, bandB, flank_mask):
     # Threshold to [0, 1]
     ratio = np.ma.where(ratio > 0, ratio, 0)
     ratio = np.where(ratio < 1, ratio, 1)
-    #show(ratio, colormap="YlGnBu_r")
+    show(ratio, colormap="YlGnBu_r")
 
     return ratio, "C-AA"
 
@@ -65,47 +75,84 @@ def inv_relative_absorbance(bandA, bandB, flank_mask):
 
     return inv, "C-IAA"
 
-def diff_mvmt(bandA, ts_bandA):
+def diff_mvmt(bandA, ts_bandA_n1, ts_bandA_p1):
     '''Calculate the absolute value of the difference between two bandA frames.'''
+    #show(ts_bandA_n1)
+    scaled_A_n1, scaled_ts_n1 = scale_by_percentile(bandA, ts_bandA_n1, 95)
+    scaled_diff_n1 = np.abs(scaled_A_n1.astype(np.float32) - scaled_ts_n1.astype(np.float32))
 
-    scaled_A, scaled_ts = scale_by_percentile(bandA, ts_bandA, 95)
-    scaled_diff = np.abs(scaled_A.astype(np.float32) - scaled_ts.astype(np.float32))
-    scaled_diff = cv2.blur(scaled_diff, (10, 10))
+    scaled_A_p1, scaled_ts_p1 = scale_by_percentile(bandA, ts_bandA_p1, 95)
+    scaled_diff_p1 = np.abs(scaled_A_p1.astype(np.float32) - scaled_ts_p1.astype(np.float32))
+
+    scaled_diff = cv2.blur(scaled_diff_n1 + scaled_diff_p1, (10, 10))
     scaled_diff = min_max_scale(scaled_diff)
-    #show(scaled_diff)
+
+    #scaled_diff_one_ts = cv2.blur(scaled_diff_p1, (10,10))
+    #scaled_diff_one_ts = min_max_scale(scaled_diff_one_ts)
+
+    #fig, axs = plt.subplots(ncols=2)
+    #axs[0].imshow(scaled_diff_one_ts, cmap="gray")
+    #axs[1].imshow(scaled_diff, cmap="gray")
+    #plt.show()
+
     return scaled_diff, "C-M"
 
-def inv_diff_mvmt(bandA, ts_bandA):
-    scaled_diff = diff_mvmt(bandA, ts_bandA)[0]
+def inv_diff_mvmt(bandA, ts_bandA_n1, ts_bandA_p1):
+    scaled_diff = diff_mvmt(bandA, ts_bandA_n1, ts_bandA_p1)[0]
     inv_scaled_diff = np.ones_like(scaled_diff) - scaled_diff
     return inv_scaled_diff, "C-IM"
-def mvmt_above_noise(bandA, ts_bandA, flank_mask):
+def mvmt_above_noise(bandA, ts_bandA_n1, ts_bandA_p1, flank_mask):
     '''Select pixels with movement below the noise level as potential background pixels.'''
-    scaled_diff = diff_mvmt(bandA, ts_bandA)[0]
+    scaled_diff = diff_mvmt(bandA, ts_bandA_n1, ts_bandA_p1)[0]
     scaled_diff = np.ma.masked_where(flank_mask == 0, scaled_diff)
-    c, l, r = hist_max_thresh(scaled_diff, plot=False)
+    show(scaled_diff)
+    c, l, r = hist_max_thresh(scaled_diff, plot=True)
     diff_thresh = np.where(scaled_diff > r, 1, 0)
+
     return diff_thresh, "C-M_t"
 
-def rel_abs_temp_diff(bandA, bandB, ts_bandA, ts_bandB):
-    bandB_zero = np.where(bandB == 0, 5, 0)
-    edge_mask = cv2.blur(bandB_zero, (11, 11))
-    edge_mask[:, 0:6] = 1
-    edge_mask[:, -5:] = 1
-    edge_mask[0:6, :] = 1
-    edge_mask[-5:, :] = 1
+def rel_abs_temp_diff(bandA_seq, bandB_seq, edge_mask):
+    '''Sequences should be input in order [bandA, one timestep, the other timestep]'''
+    og_ratio = log_ratio_AA(bandA_seq[0], bandB_seq[0], edge_mask)
+    show(og_ratio)
+    ts_ratio_1 = log_ratio_AA(bandA_seq[1], bandB_seq[1], edge_mask)
+    ts_ratio_2 = log_ratio_AA(bandA_seq[2], bandB_seq[2], edge_mask)
 
-    og_ratio = log_ratio_AA(bandA, bandB, edge_mask)
-    ts_ratio = log_ratio_AA(ts_bandA, ts_bandB, edge_mask)
     #Scaling so that the 95th percentile range of each image covers range [1, 0]
     #(Switched from scaling one percentile value to match the other as sometimes this results in scale factor zero if one percentile is zero).
     scaled_og = min_max_percentile(og_ratio, 95)
-    scaled_ts = min_max_percentile(ts_ratio, 95)
+    scaled_ts_1 = min_max_percentile(ts_ratio_1, 95)
+    scaled_ts_2 = min_max_percentile(ts_ratio_2, 95)
 
-    AA_diff = np.abs(scaled_og - scaled_ts)
-    AA_diff = np.where(AA_diff > 1, 1, AA_diff)
-    AA_diff = np.ma.masked_where(edge_mask > 0, AA_diff)
-    return AA_diff, "C-AM"
+    AA_diff_1 = np.abs(scaled_og - scaled_ts_1)
+    AA_diff_2 = np.abs(scaled_og - scaled_ts_2)
+
+    AA_diff_1 = np.where(AA_diff_1 > 1, 1, AA_diff_1)
+    AA_diff_2 = np.where(AA_diff_2 > 1, 1, AA_diff_2)
+
+    AA_diff_1 = np.ma.masked_where(edge_mask > 0, AA_diff_1)
+    AA_diff_2 = np.ma.masked_where(edge_mask > 0, AA_diff_2)
+
+    #blur_size = 5
+    #smoothed_diff_1 = cv2.blur(AA_diff_1, (blur_size, blur_size))
+    #smoothed_diff_2 = cv2.blur(AA_diff_2, ksize=(blur_size, blur_size))
+
+    #additional_mask = np.where(cv2.blur(edge_mask.astype(np.uint8) * blur_size, (blur_size, blur_size)) > 0, 1, 0)
+    #smoothed_diff_1 = np.ma.masked_where(additional_mask, smoothed_diff_1)
+    #smoothed_diff_2 = np.ma.masked_where(additional_mask, smoothed_diff_2)
+
+    total_AA_diff = AA_diff_1 + AA_diff_2
+
+    blur_size = 5
+    smoothed_diff = cv2.blur(total_AA_diff, (blur_size, blur_size))
+    additional_mask = np.where(cv2.blur(edge_mask.astype(np.uint8) * (blur_size + 1), (blur_size + 1, blur_size + 1)) > 0, 1, 0)
+    smoothed_diff = np.ma.masked_where(additional_mask, smoothed_diff)
+
+    #fig, axs = plt.subplots(ncols=2)
+    #axs[0].imshow(total_AA_diff, cmap="YlGnBu_r")
+    #axs[1].imshow(smoothed_diff, cmap="YlGnBu_r")
+    #plt.show()
+    return smoothed_diff, "C-AM"
 
 def function_over_grid(activation, grid_size, function, nan_fill, min_box_prop=0.75, plot=False):
     '''Ignoring any masked values, calculate the function (e.g. mean or sd)
@@ -156,6 +203,41 @@ def function_over_grid(activation, grid_size, function, nan_fill, min_box_prop=0
 
     return result
 
+def superpixels(c1, c2, c3, k, comp, plot=False):
+    '''Paramter k indicates the number of approximately evenly sized superpixels to be initialised.
+    Then comp indicaties the importance of compactness (spatially close, even sized pixels vs. colour distance)'''
+    three_channel = np.stack([c1, c2, c3], axis=-1)
+    segments_slic = slic(three_channel, n_segments=k, compactness=comp, sigma=1, start_label=1)
+
+    if plot == True:
+        fig, ax = plt.subplots(ncols=2)
+        ax[0].imshow(segments_slic)
+        ax[0].set_title("Superpixels")
+        ax[1].imshow(mark_boundaries(three_channel, segments_slic)[:,:,0], cmap="gray")
+        ax[1].set_title('Boundaries')
+        ax[0].set_axis_off()
+        ax[1].set_axis_off()
+        plt.show()
+
+    return segments_slic
+
+def ws(image, plot=False):
+    c, l ,r = hist_max_thresh(image, plot=True)
+
+    #TODO based on an example, I think this works better if seeds are small and separate,
+    #and of integer values
+
+    markers = np.where(image < l - 1, 1, 0)
+    edges = filters.sobel(image)
+    result = watershed(edges, markers=markers, compactness=1000)
+
+    fig, axs = plt.subplots(ncols=3)
+    axs[0].imshow(edges)
+    axs[1].imshow(markers)
+    axs[2].imshow(result)
+    plt.show()
+
+    return result
 
 
 
