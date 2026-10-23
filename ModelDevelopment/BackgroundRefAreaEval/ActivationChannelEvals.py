@@ -14,10 +14,11 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Kilauea"]
+#locations = ["Reventador"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 25
+mod = 11
+grid_size = 30
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 to_predict = "Background"
 save_results = False
@@ -58,7 +59,7 @@ for llo in locations: #Leaving out one location at a time
         volc_dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(samples_df["volcano_dictionary_name"][sample_index])
         sequence, names, plume_mask, flank_mask = read_sample(sample_index, samples_df, timesteps, "A", volc_dictionary, paths_dictionary)
         sequence_B, names_B, NA, flank_mask = read_sample(sample_index, samples_df, timesteps, "B", volc_dictionary, paths_dictionary)
-
+        show(sequence[0])
         '''Each method may include its own masking of pixels e.g. when absorbance is 
         calculated. The flank is masked out of the selected ref-areas below, incase this
         hasn't been done already in the method. '''
@@ -80,28 +81,20 @@ for llo in locations: #Leaving out one location at a time
         #scaled_brightness, method_name = relative_brightness_99p(sequence[0])
         #ref_activ, method_name = relative_darkness(sequence[0])
         #inv_absorbance, method_name = inv_relative_absorbance(sequence[0], sequence_B[0], flank_mask)
-        #absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
+        absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
         #ref_activ, method_name = inv_diff_mvmt(sequence[0], sequence[1])
         #movement, method_name = mvmt_above_noise(sequence[0], sequence[1], sequence[2], flank_mask)
         #ref_activ, method_name = diff_mvmt(sequence[0], sequence[1], sequence[2])
-        abs_diff, method_name = rel_abs_temp_diff(sequence, sequence_B, edge_mask)
+        #abs_diff, method_name = rel_abs_temp_diff(sequence, sequence_B, edge_mask)
+        #abv, method_name = abs_var(sequence[0], sequence_B[0], grid_size=grid_size, flank_mask=flank_mask, to_mask=to_mask)
+        #adv, method_name = abs_diff_var(sequence, sequence_B, grid_size, edge_mask, to_mask)
 
-
-        #abs_activ_1 = absorbance
-        #abs_activ_1 = np.ma.masked_where(to_mask > 0, abs_activ_1)
-        #abs_activ_1 = function_over_grid(abs_activ_1, grid_size=50, function="var", nan_fill=0, min_box_prop=0.95,
-        #                               plot=True)
-        #abs_activ_1 = np.ma.sqrt(abs_activ_1)
-
-        abs_activ_2 = abs_diff
-        #show(abs_diff)
-        abs_activ_2 = np.ma.masked_where(to_mask > 0, abs_activ_2)
-        abs_activ_2 = function_over_grid(abs_activ_2, grid_size=100, function="var", nan_fill=0, min_box_prop=0.95, plot=True)
-        abs_activ_2 = np.sqrt(abs_activ_2)
-        #show(abs_activ_2)
 
         #### Combine the channels to form the activation
-        ref_activ = abs_activ_2
+        ref_activ = absorbance
+        #ref_activ = ero(ref_activ, 50, mask_out=to_mask, plot=False)
+        #ref_activ = dil(ref_activ, 30, mask_out=to_mask, plot=True)
+
         #ref_activ = brightness - absorbance - 0.25 * movement - 5 * abs_activ_1 - 20 * abs_activ_2
         #ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
 
@@ -110,7 +103,7 @@ for llo in locations: #Leaving out one location at a time
         #show(ref_activ, colormap="gray")
 
         #ref_activ = ws(ref_activ, plot=True)
-        method_name = "C-7"
+        #method_name = "AV"
 
         #to_superpixel = np.where(flank_mask > 0, brightness, 0)
         #to_superpixel = min_max_scale(to_superpixel)
@@ -183,7 +176,7 @@ for llo in locations: #Leaving out one location at a time
         metrics_df.loc[len(metrics_df)] = new_row
         all_samples_metrics.loc[len(all_samples_metrics)] = new_row
 
-    #Save the per-image metrics df
+    #Save the per-image metrics df #"_gs-" + str(grid_size) +
     per_image_metrics_save_name = method_name + "_wo" + llo + "_" + set_to_consider + "_mod" + str(
         mod) + "_quality-" + filter_for_quality + ".csv"
     if save_results == True:
@@ -240,6 +233,7 @@ mean_over_folds_row = {"fold": "location-balanced",
 overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = mean_over_folds_row
 
 #Save the summary df
+#"_gs-" + str(grid_size)
 summary_save_name = method_name + "_mean_" + set_to_consider + "_mod" + str(
         mod) + "_quality-" + filter_for_quality + ".csv"
 if save_results == True:

@@ -201,7 +201,7 @@ def AUC_PR(predictions, ground_truth, flank_mask, exclude_edges, bandB, plot=Fal
     #print(np.nansum(ground_truth))
 
     if np.nansum(ground_truth) < min_true_pos:
-        show(ground_truth)
+        #show(ground_truth)
         #If the true mask is zero, then set AUC and recall-at-precision values to undefined
         return np.nan, np.nan, np.nan, np.nan, np.nan
 

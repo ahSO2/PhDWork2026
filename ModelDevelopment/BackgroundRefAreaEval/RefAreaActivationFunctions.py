@@ -5,6 +5,7 @@ from skimage import filters
 from skimage.segmentation import felzenszwalb, slic
 from skimage.segmentation import mark_boundaries
 from skimage.segmentation import watershed
+from skimage.morphology import dilation, erosion, disk, footprint_rectangle
 
 from ScalingFunctions import min_max_scale, scale_values_to_01, scale_by_percentile, hist_max_thresh, min_max_percentile
 from Show import show
@@ -62,9 +63,8 @@ def relative_absorbance(bandA, bandB, flank_mask):
 
     # Threshold to [0, 1]
     ratio = np.ma.where(ratio > 0, ratio, 0)
-    ratio = np.where(ratio < 1, ratio, 1)
-    show(ratio, colormap="YlGnBu_r")
-
+    ratio = np.ma.where(ratio < 1, ratio, 1)
+    #show(ratio, colormap="YlGnBu_r")
     return ratio, "C-AA"
 
 def inv_relative_absorbance(bandA, bandB, flank_mask):
@@ -114,7 +114,7 @@ def mvmt_above_noise(bandA, ts_bandA_n1, ts_bandA_p1, flank_mask):
 def rel_abs_temp_diff(bandA_seq, bandB_seq, edge_mask):
     '''Sequences should be input in order [bandA, one timestep, the other timestep]'''
     og_ratio = log_ratio_AA(bandA_seq[0], bandB_seq[0], edge_mask)
-    show(og_ratio)
+    #show(og_ratio)
     ts_ratio_1 = log_ratio_AA(bandA_seq[1], bandB_seq[1], edge_mask)
     ts_ratio_2 = log_ratio_AA(bandA_seq[2], bandB_seq[2], edge_mask)
 
@@ -154,7 +154,25 @@ def rel_abs_temp_diff(bandA_seq, bandB_seq, edge_mask):
     #plt.show()
     return smoothed_diff, "C-AM"
 
-def function_over_grid(activation, grid_size, function, nan_fill, min_box_prop=0.75, plot=False):
+def abs_var(imgA, imgB, grid_size, flank_mask, to_mask):
+        '''to_mask indicates edge and flank pixels to exclude from the grid calculations.'''
+        ab = relative_absorbance(imgA, imgB, flank_mask)[0]
+        ab = np.ma.masked_where(to_mask > 0, ab)
+        sd = function_over_grid(ab, grid_size=grid_size, function="var", nan_fill=0, max_masked_prop=0.90,
+                                       plot=False)
+        sqrt_sd = np.ma.sqrt(sd)
+        return sqrt_sd, "C-AV"
+
+def abs_diff_var(sequence, sequence_B, grid_size, edge_mask, to_mask):
+    ad = rel_abs_temp_diff(sequence, sequence_B, edge_mask)[0]
+    ad = np.ma.masked_where(to_mask > 0, ad)
+    ad_sd = function_over_grid(ad, grid_size=grid_size, function="var", nan_fill=0, max_masked_prop=0.90, plot=False)
+    ad_sd_sqrt = np.ma.sqrt(ad_sd)
+    #show(ad_sd_sqrt)
+    return ad_sd_sqrt, "C-ADV"
+
+
+def function_over_grid(activation, grid_size, function, nan_fill, max_masked_prop=0.75, plot=False):
     '''Ignoring any masked values, calculate the function (e.g. mean or sd)
     of the given activation over a grid of the specified size.
     Any box which intersects less than 30% with the unmasked values is excluded,
@@ -185,7 +203,7 @@ def function_over_grid(activation, grid_size, function, nan_fill, min_box_prop=0
                 masked_prop = np.sum(box_mask) / (box.shape[0] * box.shape[1])
                 #print(masked_prop)
 
-            if masked_prop > min_box_prop:
+            if masked_prop > max_masked_prop:
                 value = nan_fill
             elif function == "mean":
                 value = np.nanmean(box)
@@ -239,7 +257,44 @@ def ws(image, plot=False):
 
     return result
 
+def dil(grayscale, r, mask_out, plot=False):
+    fp = footprint_rectangle((r,r))
+    gs = np.where(mask_out > 0, np.ma.min(grayscale), grayscale)
+    result = dilation(gs, fp)
 
+    if plot == True:
+        joined = np.concatenate([gs, result], axis=1)
+        u = np.nanmax(joined)
+        l = np.nanmin(joined)
+        fig, ax = plt.subplots(ncols=2)
+        ax[0].imshow(gs, vmax=u, vmin=l)
+        ax[0].set_title("Original")
+        ax[1].imshow(result, vmax=u, vmin=l)
+        ax[1].set_title('Transformed')
+        ax[0].set_axis_off()
+        ax[1].set_axis_off()
+        plt.show()
+    return result
+
+def ero(grayscale, r, mask_out, plot=False):
+    fp = footprint_rectangle((r,r))
+    gs = np.where(mask_out > 0, np.ma.min(grayscale), grayscale)
+    result = erosion(gs, fp)
+
+    if plot == True:
+        joined = np.concatenate([gs, result], axis=1)
+        u = np.nanmax(joined)
+        l = np.nanmin(joined)
+
+        fig, ax = plt.subplots(ncols=2)
+        ax[0].imshow(gs, vmax=u, vmin=l)
+        ax[0].set_title("Original")
+        ax[1].imshow(result, vmax=u, vmin=l)
+        ax[1].set_title('Transformed')
+        ax[0].set_axis_off()
+        ax[1].set_axis_off()
+        plt.show()
+    return result
 
 
 
