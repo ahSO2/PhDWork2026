@@ -28,7 +28,7 @@ def relative_brightness_99p(bandA):
     scaled = scale_values_to_01(lower, upper, bandA)
     scaled = np.where(scaled > 1, 1, scaled)
     scaled = np.where(scaled < 0, 0, scaled)
-    show(scaled, title="Scaled to [0, 1]")
+    #show(scaled, title="Scaled to [0, 1]")
     return scaled, "C-BS"
 
 def relative_darkness(bandA):
@@ -105,8 +105,8 @@ def mvmt_above_noise(bandA, ts_bandA_n1, ts_bandA_p1, flank_mask):
     '''Select pixels with movement below the noise level as potential background pixels.'''
     scaled_diff = diff_mvmt(bandA, ts_bandA_n1, ts_bandA_p1)[0]
     scaled_diff = np.ma.masked_where(flank_mask == 0, scaled_diff)
-    show(scaled_diff)
-    c, l, r = hist_max_thresh(scaled_diff, plot=True)
+    #show(scaled_diff)
+    c, l, r = hist_max_thresh(scaled_diff, plot=False)
     diff_thresh = np.where(scaled_diff > r, 1, 0)
 
     return diff_thresh, "C-M_t"

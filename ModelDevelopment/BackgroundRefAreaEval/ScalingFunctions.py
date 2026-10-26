@@ -34,8 +34,8 @@ def scale_by_percentile(img1, img2, p):
         img2_values = img2.flatten()
     p95_1 = np.percentile(img1_values, p)
     p95_2 = np.percentile(img2_values, p)
-    print(p95_1)
-    print(p95_2)
+    #print(p95_1)
+    #print(p95_2)
 
     if p95_1 > p95_2:
         scale_factor = p95_1/p95_2

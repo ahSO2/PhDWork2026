@@ -36,6 +36,7 @@ columns = ["image_name", "volcano_name", "AUC_PR", "R_AP99", "R_AP95", "R_AP90",
 summary_columns = ["fold", "AUC_PR", "AUC_PR_L", "AUC_PR_U", "R_AP99", "R_AP99_L", "R_AP99_U", "R_AP95", "R_AP95_L", "R_AP95_U", "R_AP90", "R_AP90_L", "R_AP90_U", "P_AR99", "P_AR99_L", "P_AR99_U"]
 overall_CV_fold_results_df = pd.DataFrame(columns=summary_columns) #Dataframe to store summary results for each fold
 all_samples_metrics = pd.DataFrame(columns=columns)
+
 for llo in locations: #Leaving out one location at a time
 
     metrics_df = pd.DataFrame(columns=columns)

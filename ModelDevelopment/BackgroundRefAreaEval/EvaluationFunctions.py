@@ -183,7 +183,7 @@ def find_recall_at_precision_level(recalls, precisions, precision_level):
 
     rel_indexes = [i for i in range(len(recalls)) if precisions[i] > precision_level]
     rel_recalls = [recalls[ri] for ri in rel_indexes]
-    print("Max recall at precision " + str(precision_level)  + " is " + str(max(rel_recalls)))
+    #print("Max recall at precision " + str(precision_level)  + " is " + str(max(rel_recalls)))
     return max(rel_recalls)
 
 def find_precision_at_recall_level(recalls, precisions, recall_level):

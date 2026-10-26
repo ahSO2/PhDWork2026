@@ -38,7 +38,7 @@ def read_sample(sample_index, df, timesteps, band, volcano_dictionary, paths_dic
         names.append(name_to_read)
 
         if "image_name" in timestep_name and band == "A":
-            print(name_to_read)
+            #print(name_to_read)
             mask_path = paths_dictionary["segmentation_masks_path"] + batch + "/PlumeAndExpPixels_" + name_to_read.split(".")[0] + ".npy"
             # print("Reading plume mask from: " + mask_path)
             two_channel_mask = np.load(mask_path)  # Manually drawn plume mask (value 1 indicates plume)
