@@ -221,11 +221,15 @@ def function_over_grid(activation, grid_size, function, nan_fill, max_masked_pro
 
     return result
 
-def superpixels(c1, c2, c3, k, comp, plot=False):
+def slic_superpixels(c1, c2, c3, k, comp, to_mask, plot=False):
     '''Paramter k indicates the number of approximately evenly sized superpixels to be initialised.
     Then comp indicaties the importance of compactness (spatially close, even sized pixels vs. colour distance)'''
+
     three_channel = np.stack([c1, c2, c3], axis=-1)
-    segments_slic = slic(three_channel, n_segments=k, compactness=comp, sigma=1, start_label=1)
+    #show(three_channel)
+    pixels_to_consider = np.where(to_mask > 0, 0, 1)
+
+    segments_slic = slic(three_channel, n_segments=k, compactness=comp, mask=pixels_to_consider)
 
     if plot == True:
         fig, ax = plt.subplots(ncols=2)
@@ -238,6 +242,41 @@ def superpixels(c1, c2, c3, k, comp, plot=False):
         plt.show()
 
     return segments_slic
+
+def function_over_superpixels(superpixels, activation, plot=False):
+    '''Start with an array of zeroes. For each superpixel in superpixels (an image where each superpixel is an integer value),
+    fill that area with the mean of the activation in that pixel. Any area with superpixel value==0 is ignored.'''
+
+    result = np.zeros_like(activation)
+    n_pixels = int(np.max(superpixels))
+    if n_pixels > 0:
+        for pixel_no in range(1, n_pixels + 1):
+            pixel_mask = np.where(superpixels == pixel_no, 0, 1)
+            masked_activ = np.ma.masked_where(pixel_mask, activation)
+            #show(masked_activ)
+            mean_val = np.ma.mean(masked_activ)
+            result = np.where(superpixels == pixel_no, mean_val, result)
+
+    if plot == True:
+        fig, axs = plt.subplots(ncols=3)
+        left = axs[0].imshow(superpixels, cmap="plasma")
+
+        joined = np.concatenate([activation, result])
+        u = np.nanmax(joined)
+        l = np.nanmin(joined)
+        center = axs[1].imshow(activation, cmap="gray", vmin=l, vmax=u)
+        right = axs[2].imshow(result, cmap="gray", vmin=l, vmax=u)
+
+        axs[0].set_axis_off()
+        axs[0].set_title("Superpixels")
+        axs[1].set_axis_off()
+        axs[1].set_title("Activation Function")
+        axs[2].set_axis_off()
+        axs[2].set_title("Mean in Superpixels")
+
+        plt.show()
+
+    return result
 
 def ws(image, plot=False):
     c, l ,r = hist_max_thresh(image, plot=True)

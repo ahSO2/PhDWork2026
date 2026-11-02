@@ -17,11 +17,11 @@ locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Kilauea"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 1
+mod = 10
 grid_size = 30
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 to_predict = "Background"
-save_results = True
+save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/Combination_Params_Grid_search/"
 random_seed = 42
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
@@ -33,7 +33,7 @@ paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dat
 
 ########################################### Params
 
-a_range = [0.5]
+a_range = [1]
 b_range = [0, -0.5, -1]
 c_range = [0, -0.5, -1]
 d_range = [0, -0.5, -1]

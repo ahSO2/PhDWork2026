@@ -8,18 +8,19 @@ import sys
 from EvaluationFunctions import *
 from ReadingFunctions import *
 from RefAreaSelectionFunctions import *
+from Show import *
 
 sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Kilauea"]
+#locations = ["Reventador"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 5
-timesteps = ["image_name", "next_tensec_name"]
+mod = 10
+timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 save_results = False
-save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
+save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Custom/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
                     "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026/",
@@ -61,24 +62,33 @@ for llo in locations: #Leaving out one location at a time
         smoothed_flank_mask = cv2.blur(flank_mask * 5, (20, 20))
         flank_mask = np.where(smoothed_flank_mask < 5, 0, 1)
 
+        bandB_zero = np.where(sequence_B[0] == 0, 5, 0)
+        edge_mask = cv2.blur(bandB_zero, (11, 11))
+        edge_mask[:, 0:6] = 1
+        edge_mask[:, -5:] = 1
+        edge_mask[0:6, :] = 1
+        edge_mask[-5:, :] = 1
+        to_mask = np.where(flank_mask == 0, 1, 0) + edge_mask
+
+        #show_target_mask(sequence[0], plume_mask, edge_mask)
+
         '''Each method may include its own masking of pixels e.g. when absorbance is 
         calculated. The flank is masked out of the selected ref-areas below, incase this
         hasn't been done already in the method. '''
 
         #Calculate the reference areas with the chosen method
-        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=False)
-        ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
-        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
-        #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
-        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
+        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=True)
+        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=True)
+        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=True, output="both")
+        #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=True)
+        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=True)
-        #ref_areas, method_name = custom_combined(sequence[0], sequence_B[0], sequence[1], sequence_B[1], flank_mask, plot=True)
+        ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
 
-        #Methods which instead return an activation
-        ref_activ, method_name = relative_brightness(sequence[0])
-        ref_activ = np.where(flank_mask==1, ref_activ, 0)
-        ref_areas = np.zeros_like(ref_activ)
+        #Or custom method:
+        activation, method_name = custom_grid_mean(sequence, sequence_B, flank_mask, edge_mask, to_mask)
+        ref_areas = np.where(activation > hist_max_thresh(activation, plot=False)[2], 1, 0)
+        method_name = "HistThreshActiv"
 
         if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -102,11 +112,10 @@ for llo in locations: #Leaving out one location at a time
             plt.show()
 
         #Mask out the flank area, incase the method hasn't included this already
-        ref_areas = np.where(flank_mask == 1, ref_areas, 0)
-        ground_truth_bg = np.where(plume_mask == 0, flank_mask, 0)
+        ref_areas = np.where(to_mask == 0, ref_areas, 0)
+        inv_plume_mask = np.where(plume_mask == 0, 1, 0)
+        ground_truth_bg = np.where(to_mask == 0, inv_plume_mask, 0)
 
-        auc_pr = AUC_PR(ref_activ, ground_truth_bg, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
-                        plot=True)
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)

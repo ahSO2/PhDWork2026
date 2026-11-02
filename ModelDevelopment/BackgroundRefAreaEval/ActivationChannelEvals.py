@@ -14,15 +14,16 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Reventador"]
+#locations = ["Merapi"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
 mod = 11
-grid_size = 30
+channels_grid_size = 30
+smoothing_grid_size = 30 #TODO Edit here
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 to_predict = "Background"
 save_results = False
-save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/"
+save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/Smoothing/GridMean/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
                     "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026/",
@@ -78,46 +79,53 @@ for llo in locations: #Leaving out one location at a time
         to_mask = np.where(flank_mask == 0, 1, 0) + edge_mask
 
         #Methods which instead return an activation
-        #brightness, method_name = relative_brightness(sequence[0])
-        #scaled_brightness, method_name = relative_brightness_99p(sequence[0])
-        #ref_activ, method_name = relative_darkness(sequence[0])
-        #inv_absorbance, method_name = inv_relative_absorbance(sequence[0], sequence_B[0], flank_mask)
+        scaled_brightness, method_name = relative_brightness_99p(sequence[0])
         absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
-        #ref_activ, method_name = inv_diff_mvmt(sequence[0], sequence[1])
-        #movement, method_name = mvmt_above_noise(sequence[0], sequence[1], sequence[2], flank_mask)
-        #ref_activ, method_name = diff_mvmt(sequence[0], sequence[1], sequence[2])
-        #abs_diff, method_name = rel_abs_temp_diff(sequence, sequence_B, edge_mask)
-        #abv, method_name = abs_var(sequence[0], sequence_B[0], grid_size=grid_size, flank_mask=flank_mask, to_mask=to_mask)
-        #adv, method_name = abs_diff_var(sequence, sequence_B, grid_size, edge_mask, to_mask)
-
+        movement, method_name = mvmt_above_noise(sequence[0], sequence[1], sequence[2], flank_mask)
+        abv, method_name = abs_var(sequence[0], sequence_B[0], grid_size=channels_grid_size, flank_mask=flank_mask, to_mask=to_mask)
+        adv, method_name = abs_diff_var(sequence, sequence_B, grid_size=channels_grid_size, edge_mask=edge_mask, to_mask=to_mask)
 
         #### Combine the channels to form the activation
-        ref_activ = absorbance
-        #ref_activ = ero(ref_activ, 50, mask_out=to_mask, plot=False)
-        #ref_activ = dil(ref_activ, 30, mask_out=to_mask, plot=True)
+        ref_activ = (0.5 * scaled_brightness) + (-0.5 * absorbance) + (-1 * movement) + (-1 * abv) + (-1 * adv)
 
-        #ref_activ = brightness - absorbance - 0.25 * movement - 5 * abs_activ_1 - 20 * abs_activ_2
-        #ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
+        ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
+        #show(ref_activ)
+        #show(ref_activ)
 
         #### Apply gap-filling/smoothing
-        #ref_activ = function_over_grid(ref_activ, grid_size=50, function="mean", nan_fill=0, min_box_prop=0.75, plot=False)
-        #show(ref_activ, colormap="gray")
+        # ref_activ = ero(ref_activ, 50, mask_out=to_mask, plot=False)
+        # ref_activ = dil(ref_activ, 30, mask_out=to_mask, plot=True)
 
+        #Grid Mean or SD
+        #mean = function_over_grid(ref_activ, grid_size=smoothing_grid_size, function="mean", nan_fill=0, max_masked_prop=0.90, plot=True)
+        #sd = function_over_grid(ref_activ, grid_size=smoothing_grid_size, function="var", nan_fill=0, max_masked_prop=0.90, plot=True)
+        #ref_activ = mean - sd
+
+        #show(ref_activ)
+        #show(ref_activ, colormap="gray")
         #ref_activ = ws(ref_activ, plot=True)
         #method_name = "AV"
 
-        #to_superpixel = np.where(flank_mask > 0, brightness, 0)
-        #to_superpixel = min_max_scale(to_superpixel)
-        #sp = superpixels(to_superpixel, to_superpixel, to_superpixel, k=30, comp=7, plot=True)
+        '''
+        scaled_band_B, method_name_B = relative_brightness_99p(sequence_B[0])
+        scaled_activation = min_max_scale(ref_activ)
+        inv_activation = 1 - scaled_activation
+        #show(inv_activation)
+        sp = slic_superpixels(scaled_brightness, scaled_band_B, inv_activation, k=30, comp=50, to_mask=to_mask, plot=True)
+        ref_activ = function_over_superpixels(sp, ref_activ, plot=True)
+        '''
 
         #show(brightness)
-        #ref_smoothed = cross_bilateral_filter_fast(image=ref_activ, ref_img=brightness * 100, sigma_s=25, sigma_r=10, sa_s=10, sa_r=4)
-        #fig, axs = plt.subplots(ncols=2)
-        #axs[0].imshow(ref_activ, cmap="gray")
-        #axs[1].imshow(ref_smoothed, cmap="gray", vmax=np.max(ref_activ), vmin=np.min(ref_activ))
-        #axs[0].set_axis_off()
-        #axs[1].set_axis_off()
-        #plt.show()
+        ref_img = scaled_brightness * 100
+        ref_img = np.where(ref_activ.mask, -100, ref_img)
+        ref_smoothed = cross_bilateral_filter_fast(image=ref_activ, ref_img=ref_img, sigma_s=25, sigma_r=10, sa_s=10, sa_r=4)
+        ref_smoothed = np.ma.masked_where(ref_activ.mask, ref_smoothed)
+        fig, axs = plt.subplots(ncols=2)
+        axs[0].imshow(ref_activ, cmap="gray")
+        axs[1].imshow(ref_smoothed, cmap="gray", vmax=np.max(ref_activ), vmin=np.min(ref_activ))
+        axs[0].set_axis_off()
+        axs[1].set_axis_off()
+        plt.show()
         #show(ref_activ)
 
         if sample_index < 0: #Plot the timesteps and masks
@@ -159,13 +167,19 @@ for llo in locations: #Leaving out one location at a time
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
-            axs[0,0].imshow(brightness, cmap="gray")
+            axs[0,0].imshow(scaled_brightness, cmap="gray")
             axs[1,0].imshow(absorbance, cmap="gray")
             axs[0,1].imshow(movement, cmap="gray")
-            axs[1,1].imshow(abs_activ_1, cmap="gray")
+            axs[1,1].imshow(abv, cmap="gray")
             axs[0,2].imshow(ground_truth, cmap="gray")
             axs[1,2].imshow(ref_activ, cmap="gray")
             plt.show()
+
+        #show(scaled_brightness, colormap="gray")
+        #show(absorbance, colormap="YlGnBu_r")
+        #show(movement, colormap="gray")
+        #show(abv)
+        #show(ref_activ, colormap="gray")
 
         new_row = {"image_name": names[0],
                    "volcano_name": samples_df["volcano_name"][sample_index],
@@ -177,8 +191,8 @@ for llo in locations: #Leaving out one location at a time
         metrics_df.loc[len(metrics_df)] = new_row
         all_samples_metrics.loc[len(all_samples_metrics)] = new_row
 
-    #Save the per-image metrics df #"_gs-" + str(grid_size) +
-    per_image_metrics_save_name = method_name + "_wo" + llo + "_" + set_to_consider + "_mod" + str(
+    #Save the per-image metrics df
+    per_image_metrics_save_name = "CombinedActiv_gs-" + str(smoothing_grid_size) + "_wo" + llo + "_" + set_to_consider + "_mod" + str(
         mod) + "_quality-" + filter_for_quality + ".csv"
     if save_results == True:
         metrics_df.to_csv(save_path + per_image_metrics_save_name)
@@ -235,7 +249,7 @@ overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = mean_over_fold
 
 #Save the summary df
 #"_gs-" + str(grid_size)
-summary_save_name = method_name + "_mean_" + set_to_consider + "_mod" + str(
+summary_save_name = "CombinedActiv_gs-" + str(smoothing_grid_size) + "_mean_" + set_to_consider + "_mod" + str(
         mod) + "_quality-" + filter_for_quality + ".csv"
 if save_results == True:
     overall_CV_fold_results_df.to_csv(save_path + summary_save_name)
