@@ -1,3 +1,4 @@
+import astropy
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -333,6 +334,14 @@ def ero(grayscale, r, mask_out, plot=False):
         ax[0].set_axis_off()
         ax[1].set_axis_off()
         plt.show()
+    return result
+
+def masked_gauss_blur(image, mask, sigma=10):
+
+    #TODO need to write my own version of this I think
+    result = astropy.convolution.convolve(image, kernel=np.ones(3, 3))
+    show(result)
+
     return result
 
 

@@ -83,11 +83,11 @@ for llo in locations: #Leaving out one location at a time
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=True)
         #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
+        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
 
         #Or custom method:
-        activation, method_name = custom_grid_mean(sequence, sequence_B, flank_mask, edge_mask, to_mask)
-        ref_areas = np.where(activation > hist_max_thresh(activation, plot=False)[2], 1, 0)
+        #activation, method_name = custom_grid_mean(sequence, sequence_B, flank_mask, edge_mask, to_mask)
+        ref_areas, method_name = custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask)
         method_name = "HistThreshActiv"
 
         if sample_index < 0: #Plot the timesteps and masks
@@ -117,7 +117,7 @@ for llo in locations: #Leaving out one location at a time
         ground_truth_bg = np.where(to_mask == 0, inv_plume_mask, 0)
 
 
-        if sample_index < 0: #Plot the selected background regions
+        if sample_index < 1000: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
             axs[1,0].imshow(sequence_B[0], cmap="gray")

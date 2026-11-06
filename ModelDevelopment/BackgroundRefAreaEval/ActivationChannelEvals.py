@@ -17,7 +17,7 @@ locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Merapi"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 11
+mod = 30
 channels_grid_size = 30
 smoothing_grid_size = 30 #TODO Edit here
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
@@ -61,7 +61,7 @@ for llo in locations: #Leaving out one location at a time
         volc_dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(samples_df["volcano_dictionary_name"][sample_index])
         sequence, names, plume_mask, flank_mask = read_sample(sample_index, samples_df, timesteps, "A", volc_dictionary, paths_dictionary)
         sequence_B, names_B, NA, flank_mask = read_sample(sample_index, samples_df, timesteps, "B", volc_dictionary, paths_dictionary)
-        show(sequence[0])
+        #show(sequence[0])
         '''Each method may include its own masking of pixels e.g. when absorbance is 
         calculated. The flank is masked out of the selected ref-areas below, incase this
         hasn't been done already in the method. '''
@@ -115,17 +115,26 @@ for llo in locations: #Leaving out one location at a time
         ref_activ = function_over_superpixels(sp, ref_activ, plot=True)
         '''
 
-        #show(brightness)
-        ref_img = scaled_brightness * 100
-        ref_img = np.where(ref_activ.mask, -100, ref_img)
-        ref_smoothed = cross_bilateral_filter_fast(image=ref_activ, ref_img=ref_img, sigma_s=25, sigma_r=10, sa_s=10, sa_r=4)
-        ref_smoothed = np.ma.masked_where(ref_activ.mask, ref_smoothed)
+
+        #ref_smoothed = cv2.GaussianBlur(ref_activ, (29, 29), sigmaX=30, sigmaY=30)
+        ref_smoothed = masked_gauss_blur(ref_activ, ref_activ.mask, sigma=10)
+        method_name = "BL-A"
         fig, axs = plt.subplots(ncols=2)
         axs[0].imshow(ref_activ, cmap="gray")
-        axs[1].imshow(ref_smoothed, cmap="gray", vmax=np.max(ref_activ), vmin=np.min(ref_activ))
-        axs[0].set_axis_off()
-        axs[1].set_axis_off()
+        axs[1].imshow(ref_smoothed, cmap="gray")
         plt.show()
+
+        # show(brightness)
+        #ref_img = (scaled_brightness * 100).astype(np.uint8)
+        #ref_img = np.where(ref_activ.mask, -100, ref_img)
+        #ref_smoothed = cross_bilateral_filter_fast(image=ref_activ, ref_img=ref_img, sigma_s=80, sigma_r=40, sa_s=10, sa_r=5)
+        #ref_smoothed = np.ma.masked_where(ref_activ.mask, ref_smoothed)
+        #fig, axs = plt.subplots(ncols=2)
+        #axs[0].imshow(ref_activ, cmap="gray")
+        #axs[1].imshow(ref_smoothed, cmap="gray", vmax=np.max(ref_activ), vmin=np.min(ref_activ))
+        #axs[0].set_axis_off()
+        #axs[1].set_axis_off()
+        #plt.show()
         #show(ref_activ)
 
         if sample_index < 0: #Plot the timesteps and masks
@@ -162,8 +171,8 @@ for llo in locations: #Leaving out one location at a time
             min_true_pos = 600
         else:
             min_true_pos = 1
-        auc_pr, r_ap99, r_ap95, r_ap90, p_ar99 = AUC_PR(ref_activ, ground_truth, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
-                        plot=False, min_true_pos=min_true_pos)
+        auc_pr, r_ap99, r_ap95, r_ap90, p_ar99 = AUC_PR(ref_smoothed, ground_truth, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
+                        plot=True, min_true_pos=min_true_pos)
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
