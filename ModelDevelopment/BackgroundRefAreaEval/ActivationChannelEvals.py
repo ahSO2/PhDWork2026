@@ -17,13 +17,14 @@ locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Merapi"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 30
+mod = 1
 channels_grid_size = 30
-smoothing_grid_size = 30 #TODO Edit here
+#smoothing_grid_size = 30
+smoothing_disk_size = 30
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 to_predict = "Background"
-save_results = False
-save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/Smoothing/GridMean/"
+save_results = True
+save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/Smoothing/MorphTrans/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
                     "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026/",
@@ -89,11 +90,10 @@ for llo in locations: #Leaving out one location at a time
         ref_activ = (0.5 * scaled_brightness) + (-0.5 * absorbance) + (-1 * movement) + (-1 * abv) + (-1 * adv)
 
         ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
-        #show(ref_activ)
-        #show(ref_activ)
 
         #### Apply gap-filling/smoothing
-        # ref_activ = ero(ref_activ, 50, mask_out=to_mask, plot=False)
+        ref_smoothed = ero(ref_activ, smoothing_disk_size, mask_out=to_mask, plot=False)
+        #ref_smoothed = opening(ref_activ, 40, mask_out = to_mask, plot=True)
         # ref_activ = dil(ref_activ, 30, mask_out=to_mask, plot=True)
 
         #Grid Mean or SD
@@ -117,12 +117,12 @@ for llo in locations: #Leaving out one location at a time
 
 
         #ref_smoothed = cv2.GaussianBlur(ref_activ, (29, 29), sigmaX=30, sigmaY=30)
-        ref_smoothed = masked_gauss_blur(ref_activ, ref_activ.mask, sigma=10)
-        method_name = "BL-A"
-        fig, axs = plt.subplots(ncols=2)
-        axs[0].imshow(ref_activ, cmap="gray")
-        axs[1].imshow(ref_smoothed, cmap="gray")
-        plt.show()
+        #ref_smoothed = masked_gauss_blur(ref_activ, ref_activ.mask, sigma=10)
+        #method_name = "BL-A"
+        #fig, axs = plt.subplots(ncols=2)
+        #axs[0].imshow(ref_activ, cmap="gray")
+        #axs[1].imshow(ref_smoothed, cmap="gray")
+        #plt.show()
 
         # show(brightness)
         #ref_img = (scaled_brightness * 100).astype(np.uint8)
@@ -172,7 +172,7 @@ for llo in locations: #Leaving out one location at a time
         else:
             min_true_pos = 1
         auc_pr, r_ap99, r_ap95, r_ap90, p_ar99 = AUC_PR(ref_smoothed, ground_truth, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
-                        plot=True, min_true_pos=min_true_pos)
+                        plot=False, min_true_pos=min_true_pos)
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -201,7 +201,7 @@ for llo in locations: #Leaving out one location at a time
         all_samples_metrics.loc[len(all_samples_metrics)] = new_row
 
     #Save the per-image metrics df
-    per_image_metrics_save_name = "CombinedActiv_gs-" + str(smoothing_grid_size) + "_wo" + llo + "_" + set_to_consider + "_mod" + str(
+    per_image_metrics_save_name = "Ero-" + str(smoothing_disk_size) + "_wo" + llo + "_" + set_to_consider + "_mod" + str(
         mod) + "_quality-" + filter_for_quality + ".csv"
     if save_results == True:
         metrics_df.to_csv(save_path + per_image_metrics_save_name)
@@ -258,7 +258,7 @@ overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = mean_over_fold
 
 #Save the summary df
 #"_gs-" + str(grid_size)
-summary_save_name = "CombinedActiv_gs-" + str(smoothing_grid_size) + "_mean_" + set_to_consider + "_mod" + str(
+summary_save_name = "Ero-" + str(smoothing_disk_size) + "_mean_" + set_to_consider + "_mod" + str(
         mod) + "_quality-" + filter_for_quality + ".csv"
 if save_results == True:
     overall_CV_fold_results_df.to_csv(save_path + summary_save_name)
