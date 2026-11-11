@@ -14,16 +14,16 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Merapi"]
+#locations = ["Kilauea"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 1
+mod = 15
 channels_grid_size = 30
 #smoothing_grid_size = 30
-smoothing_disk_size = 30
+smoothing_disk_size = 0
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
 to_predict = "Background"
-save_results = True
+save_results = False
 save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Activations/Smoothing/MorphTrans/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
@@ -92,8 +92,9 @@ for llo in locations: #Leaving out one location at a time
         ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
 
         #### Apply gap-filling/smoothing
-        ref_smoothed = ero(ref_activ, smoothing_disk_size, mask_out=to_mask, plot=False)
-        #ref_smoothed = opening(ref_activ, 40, mask_out = to_mask, plot=True)
+        ref_smoothed = ref_activ
+        #ref_smoothed = ero(ref_activ, smoothing_disk_size, mask_out=to_mask, plot=False)
+        #ref_smoothed = opening(ref_activ, smoothing_disk_size, mask_out = to_mask, plot=False)
         # ref_activ = dil(ref_activ, 30, mask_out=to_mask, plot=True)
 
         #Grid Mean or SD
@@ -106,14 +107,14 @@ for llo in locations: #Leaving out one location at a time
         #ref_activ = ws(ref_activ, plot=True)
         #method_name = "AV"
 
-        '''
+
         scaled_band_B, method_name_B = relative_brightness_99p(sequence_B[0])
         scaled_activation = min_max_scale(ref_activ)
         inv_activation = 1 - scaled_activation
         #show(inv_activation)
         sp = slic_superpixels(scaled_brightness, scaled_band_B, inv_activation, k=30, comp=50, to_mask=to_mask, plot=True)
         ref_activ = function_over_superpixels(sp, ref_activ, plot=True)
-        '''
+
 
 
         #ref_smoothed = cv2.GaussianBlur(ref_activ, (29, 29), sigmaX=30, sigmaY=30)
@@ -129,6 +130,7 @@ for llo in locations: #Leaving out one location at a time
         #ref_img = np.where(ref_activ.mask, -100, ref_img)
         #ref_smoothed = cross_bilateral_filter_fast(image=ref_activ, ref_img=ref_img, sigma_s=80, sigma_r=40, sa_s=10, sa_r=5)
         #ref_smoothed = np.ma.masked_where(ref_activ.mask, ref_smoothed)
+
         #fig, axs = plt.subplots(ncols=2)
         #axs[0].imshow(ref_activ, cmap="gray")
         #axs[1].imshow(ref_smoothed, cmap="gray", vmax=np.max(ref_activ), vmin=np.min(ref_activ))
@@ -172,7 +174,7 @@ for llo in locations: #Leaving out one location at a time
         else:
             min_true_pos = 1
         auc_pr, r_ap99, r_ap95, r_ap90, p_ar99 = AUC_PR(ref_smoothed, ground_truth, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
-                        plot=False, min_true_pos=min_true_pos)
+                        plot=True, min_true_pos=min_true_pos)
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -181,7 +183,7 @@ for llo in locations: #Leaving out one location at a time
             axs[0,1].imshow(movement, cmap="gray")
             axs[1,1].imshow(abv, cmap="gray")
             axs[0,2].imshow(ground_truth, cmap="gray")
-            axs[1,2].imshow(ref_activ, cmap="gray")
+            axs[1,2].imshow(ref_smoothed, cmap="gray")
             plt.show()
 
         #show(scaled_brightness, colormap="gray")

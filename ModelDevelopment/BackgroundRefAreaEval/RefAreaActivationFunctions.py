@@ -298,8 +298,9 @@ def ws(image, plot=False):
     return result
 
 def dil(grayscale, r, mask_out, plot=False):
-    fp = footprint_rectangle((r,r))
-    gs = np.where(mask_out > 0, np.ma.min(grayscale), grayscale)
+    fp = disk(radius=r)
+    #gs = np.where(mask_out > 0, np.ma.min(grayscale), grayscale)
+    gs = grayscale
     result = dilation(gs, fp)
 
     if plot == True:
@@ -317,8 +318,10 @@ def dil(grayscale, r, mask_out, plot=False):
     return result
 
 def ero(grayscale, r, mask_out, plot=False):
-    fp = footprint_rectangle((r,r))
-    gs = np.where(mask_out > 0, np.ma.min(grayscale), grayscale)
+    fp = disk(radius=r)
+    #fp = footprint_rectangle((r,r))
+    #gs = np.where(mask_out > 0, np.ma.min(grayscale), grayscale)
+    gs = grayscale
     result = erosion(gs, fp)
 
     if plot == True:
@@ -335,6 +338,14 @@ def ero(grayscale, r, mask_out, plot=False):
         ax[1].set_axis_off()
         plt.show()
     return result
+
+def opening(grayscale, r, mask_out, plot=True):
+    #TODO need to write code to actually use the "mask_out" input, it's currently just using the already unmasked part of the image
+
+    eroded = ero(grayscale, r, mask_out = mask_out, plot =plot)
+    dilated = dil(eroded, r, mask_out = mask_out, plot=plot)
+    return dilated
+
 
 def masked_gauss_blur(image, mask, sigma=10):
 

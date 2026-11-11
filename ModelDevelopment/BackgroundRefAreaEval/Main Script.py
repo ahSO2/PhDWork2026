@@ -17,10 +17,10 @@ locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Reventador"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 10
+mod = 1
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
-save_results = False
-save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Custom/"
+save_results = True
+save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
                     "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026/",
@@ -77,18 +77,18 @@ for llo in locations: #Leaving out one location at a time
         hasn't been done already in the method. '''
 
         #Calculate the reference areas with the chosen method
-        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=True)
-        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=True)
-        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=True, output="both")
-        #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=True)
-        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=True)
+        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=False)
+        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
+        #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
+        #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
+        #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
+        ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
 
         #Or custom method:
         #activation, method_name = custom_grid_mean(sequence, sequence_B, flank_mask, edge_mask, to_mask)
-        ref_areas, method_name = custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask)
-        method_name = "HistThreshActiv"
+        #ref_areas, method_name = custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask)
+        #method_name = "ZeroThreshActiv"
 
         if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -117,7 +117,7 @@ for llo in locations: #Leaving out one location at a time
         ground_truth_bg = np.where(to_mask == 0, inv_plume_mask, 0)
 
 
-        if sample_index < 1000: #Plot the selected background regions
+        if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(sequence[0], cmap="gray")
             axs[1,0].imshow(sequence_B[0], cmap="gray")

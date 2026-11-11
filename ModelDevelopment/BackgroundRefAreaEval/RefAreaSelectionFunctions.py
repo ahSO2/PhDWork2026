@@ -484,14 +484,16 @@ def custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_ma
     ref_activ = (0.5 * scaled_brightness) + (-0.5 * absorbance) + (-1 * movement) + (-1 * abv) + (-1 * adv)
 
     ref_activ = np.ma.masked_where(to_mask > 0, ref_activ)
-    show(ref_activ)
+    #show(ref_activ)
 
     ref_img = (scaled_brightness * 100).astype(np.uint8)
     ref_img = np.where(ref_activ.mask, -100, ref_img)
     smoothed_activ = cross_bilateral_filter_fast(ref_activ, ref_img=ref_img, sigma_s=80, sigma_r=40, sa_s=10, sa_r=5)
-    show(smoothed_activ)
+    #show(smoothed_activ)
     smoothed_activ = np.ma.masked_where(ref_activ.mask, smoothed_activ)
 
-    ref_areas = np.where(smoothed_activ > hist_max_thresh(smoothed_activ, plot=True)[2], 1, 0)
-    show(ref_areas)
+    #thresh = hist_max_thresh(smoothed_activ, plot=True)[0]
+    thresh = 0
+    ref_areas = np.where(smoothed_activ > thresh, 1, 0)
+    #show(ref_areas)
     return ref_areas, "C-CB"
