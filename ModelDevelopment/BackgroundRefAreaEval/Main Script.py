@@ -128,6 +128,7 @@ for llo in locations: #Leaving out one location at a time
             plt.show()
 
         #TODO These counts are only valid if ref_areas is a binary mask
+        #TODO Maybe want to add code to exclude very small background target masks (i.e. where there's just a small line of pixels where mym mask doesn't overlap the flank properly)
         TP, TN, FP, FN = calculate_conf_counts(ref_areas, ground_truth_bg, exclude=np.where(flank_mask > 0, 0, 1))
         PP, PN = per_class_precision(TP, TN, FP, FN)
         RP, RN = per_class_recall(TP, TN, FP, FN)
