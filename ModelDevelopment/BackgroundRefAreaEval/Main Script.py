@@ -17,10 +17,10 @@ locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
 #locations = ["Reventador"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 1
+mod = 11
 timesteps = ["image_name", "next_tensec_name", "prev_tensec_name"]
-save_results = True
-save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/"
+save_results = False
+save_path = "C:/Users/ggp24ash/Documents/Scratch Data/BackgroundRefAreaSelection/CVFolds/Custom/"
 rng = numpy.random.default_rng(42) #Create a random number generator with seed
 paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dataset/DatasetSplits/UpdatedTVTSplits/CrossValidationSplits/",
                     "data_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/AllData_UpdatedCorrections2026/",
@@ -30,8 +30,8 @@ paths_dictionary = {"df_path":"C:/Users/ggp24ash/PycharmProjects/PhDWork2026/Dat
                     "flank_masks_path":"C:/Users/ggp24ash/Documents/Main Datasets/PlumeSegmentation/FlankMasks/"}
 
 ##################### Script
-columns = ["image_name", "volcano_name", "PP", "PN", "RP", "RN", "IOU", "F1", "VR"] #Metrics to save per image
-summary_columns = ["fold", "PP", "PP_L", "PP_U", "PN", "PN_L", "PN_U", "RP", "RP_L", "RP_U", "RN", "RN_L", "RN_U", "IOU", "IOU_L", "IOU_U", "F1_M", "F1_L", "F1_U", "VR", "VR_L", "VR_U"]
+columns = ["image_name", "volcano_name", "PP", "PN", "RP", "RN", "IOU", "F1", "PR"] #Metrics to save per image
+summary_columns = ["fold", "PP", "PP_L", "PP_U", "PN", "PN_L", "PN_U", "RP", "RP_L", "RP_U", "RN", "RN_L", "RN_U", "IOU", "IOU_L", "IOU_U", "F1_M", "F1_L", "F1_U", "PR", "PR_L", "PR_U"]
 overall_CV_fold_results_df = pd.DataFrame(columns=summary_columns) #Dataframe to store summary results for each fold
 all_samples_metrics = pd.DataFrame(columns=columns)
 for llo in locations: #Leaving out one location at a time
@@ -54,6 +54,7 @@ for llo in locations: #Leaving out one location at a time
     for sample_index in range(0, samples_df.shape[0], mod):
         print(sample_index)
         # Read the timestep sequence
+        print(samples_df["volcano_dictionary_name"][sample_index])
         volc_dictionary = VolcDictionaryWithCorrectClears.map_dictionary_name_to_dictionary(samples_df["volcano_dictionary_name"][sample_index])
         sequence, names, plume_mask, flank_mask = read_sample(sample_index, samples_df, timesteps, "A", volc_dictionary, paths_dictionary)
         sequence_B, names_B, NA, flank_mask = read_sample(sample_index, samples_df, timesteps, "B", volc_dictionary, paths_dictionary)
@@ -71,24 +72,26 @@ for llo in locations: #Leaving out one location at a time
         to_mask = np.where(flank_mask == 0, 1, 0) + edge_mask
 
         #show_target_mask(sequence[0], plume_mask, edge_mask)
+        inv_plume_mask = np.where(plume_mask == 0, 1, 0)
+        ground_truth_bg = np.where(to_mask == 0, inv_plume_mask, 0)
 
         '''Each method may include its own masking of pixels e.g. when absorbance is 
         calculated. The flank is masked out of the selected ref-areas below, incase this
         hasn't been done already in the method. '''
 
         #Calculate the reference areas with the chosen method
-        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], plot=False)
-        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], plot=False)
+        #ref_areas, method_name = delledonne_max_bandA(sequence[0], sequence_B[0], volc_dictionary, plot=False)
+        #ref_areas, method_name = delledonne_min_ratio(sequence[0], sequence_B[0], volc_dictionary, plot=False)
         #ref_areas, method_name = pyplis_rectangles_and_lines(sequence[0], plot=False, output="both")
         #ref_areas, method_name = pyplis_background_mask(sequence[0], sequence[1], plot=False)
         #ref_areas, method_name = kern_low_texture_and_ratio(sequence[0], sequence_B[0], flank_mask, plot=False)
         #ref_areas = thresholding(sequence[0], sequence_B[0], volc_dictionary, plot=True)
-        ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
+        #ref_areas, method_name = smekens_repeated_fitting(sequence[0], flank_mask, plot=False)
 
         #Or custom method:
         #activation, method_name = custom_grid_mean(sequence, sequence_B, flank_mask, edge_mask, to_mask)
-        #ref_areas, method_name = custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask)
-        #method_name = "ZeroThreshActiv"
+        ref_areas, method_name = custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask, ground_truth_bg)
+        method_name = "MorphTrans_OptimalThreshActiv"
 
         if sample_index < 0: #Plot the timesteps and masks
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -113,9 +116,6 @@ for llo in locations: #Leaving out one location at a time
 
         #Mask out the flank area, incase the method hasn't included this already
         ref_areas = np.where(to_mask == 0, ref_areas, 0)
-        inv_plume_mask = np.where(plume_mask == 0, 1, 0)
-        ground_truth_bg = np.where(to_mask == 0, inv_plume_mask, 0)
-
 
         if sample_index < 0: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -127,14 +127,18 @@ for llo in locations: #Leaving out one location at a time
             axs[1,2].imshow(ref_areas, cmap="gray")
             plt.show()
 
+        if np.sum(ground_truth_bg) < 600:  # TODO If there are very few background pixels, in this dataset it's because of small gap between the labelled plume and flank
+        # Then the metrics should be equivalent to if there was no background:
+            ground_truth_bg = np.zeros_like(ground_truth_bg)
+
         #TODO These counts are only valid if ref_areas is a binary mask
-        #TODO Maybe want to add code to exclude very small background target masks (i.e. where there's just a small line of pixels where mym mask doesn't overlap the flank properly)
         TP, TN, FP, FN = calculate_conf_counts(ref_areas, ground_truth_bg, exclude=np.where(flank_mask > 0, 0, 1))
         PP, PN = per_class_precision(TP, TN, FP, FN)
         RP, RN = per_class_recall(TP, TN, FP, FN)
         IOU = intersection_over_union(TP, TN, FP, FN)
         F1 = F1_score(PP, RP)
-        VR = variance_ratio(sequence[0], sequence_B[0], ref_areas, ground_truth_bg, flank_mask)
+        #VR = variance_ratio(sequence[0], sequence_B[0], ref_areas, ground_truth_bg, flank_mask)
+        PR = percentile_ratio(sequence[0], sequence_B[0], ref_areas, ground_truth_bg, flank_mask)
 
 
         new_row = {"image_name": names[0],
@@ -145,7 +149,7 @@ for llo in locations: #Leaving out one location at a time
                    "RN":RN,
                    "IOU":IOU,
                    "F1":F1,
-                   "VR":VR}
+                   "PR":PR}
         metrics_df.loc[len(metrics_df)] = new_row
         all_samples_metrics.loc[len(all_samples_metrics)] = new_row
 
@@ -162,7 +166,7 @@ for llo in locations: #Leaving out one location at a time
     RN_M, RN_L, RN_U, rng = mean_with_95p_bootstrap(metrics_df["RN"].to_numpy(), rng)
     IOU_M, IOU_L, IOU_U, rng = mean_with_95p_bootstrap(metrics_df["IOU"].to_numpy(), rng)
     F1_M, F1_L, F1_U, rng = mean_with_95p_bootstrap(metrics_df["F1"].to_numpy(), rng)
-    VR_M, VR_L, VR_U, rng = mean_with_95p_bootstrap(metrics_df["VR"].to_numpy(), rng)
+    PR_M, PR_L, PR_U, rng = mean_with_95p_bootstrap(metrics_df["PR"].to_numpy(), rng)
     summary_row = {"fold": llo,
                    "PP":PP_M,
                    "PP_L":PP_L,
@@ -182,9 +186,9 @@ for llo in locations: #Leaving out one location at a time
                    "F1_M":F1_M,
                    "F1_L":F1_L,
                    "F1_U":F1_U,
-                   "VR":VR_M,
-                   "VR_L":VR_L,
-                   "VR_U":VR_U}
+                   "PR":PR_M,
+                   "PR_L":PR_L,
+                   "PR_U":PR_U}
     overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = summary_row
 
 #Calculate the location-balanced mean metrics (with bootstrap CIs)
@@ -194,7 +198,7 @@ RP_M, RP_L, RP_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_me
 RN_M, RN_L, RN_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["RN"].to_numpy(), all_samples_metrics["volcano_name"], rng)
 IOU_M, IOU_L, IOU_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["IOU"].to_numpy(), all_samples_metrics["volcano_name"], rng)
 F1_M, F1_L, F1_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["F1"].to_numpy(), all_samples_metrics["volcano_name"], rng)
-VR_M, VR_L , VR_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["VR"].to_numpy(), all_samples_metrics["volcano_name"], rng)
+PR_M, PR_L , PR_U, rng = location_balanced_mean_with_95p_bootstrap(all_samples_metrics["PR"].to_numpy(), all_samples_metrics["volcano_name"], rng)
 mean_over_folds_row = {"fold": "location-balanced",
                    "PP":PP_M,
                    "PP_L":PP_L,
@@ -214,9 +218,9 @@ mean_over_folds_row = {"fold": "location-balanced",
                    "F1_M":F1_M,
                    "F1_L":F1_L,
                    "F1_U":F1_U,
-                   "VR":VR_M,
-                   "VR_L":VR_L,
-                   "VR_U":VR_U}
+                   "PR":PR_M,
+                   "PR_L":PR_L,
+                   "PR_U":PR_U}
 overall_CV_fold_results_df.loc[len(overall_CV_fold_results_df)] = mean_over_folds_row
 
 #Save the summary df

@@ -14,10 +14,10 @@ sys.path.append("C:/Users/ggp24ash/PycharmProjects/PhDWork2026/")
 import VolcDictionaryWithCorrectClears
 
 locations = ["Cotopaxi", "Kilauea", "Lascar", "Merapi", "Reventador"]
-#locations = ["Kilauea"]
+locations = ["Lascar"]
 filter_for_quality = "Good"
 set_to_consider = "UnseenTest"
-mod = 15
+mod = 1
 channels_grid_size = 30
 #smoothing_grid_size = 30
 smoothing_disk_size = 0
@@ -108,12 +108,12 @@ for llo in locations: #Leaving out one location at a time
         #method_name = "AV"
 
 
-        scaled_band_B, method_name_B = relative_brightness_99p(sequence_B[0])
-        scaled_activation = min_max_scale(ref_activ)
-        inv_activation = 1 - scaled_activation
+        #scaled_band_B, method_name_B = relative_brightness_99p(sequence_B[0])
+        #scaled_activation = min_max_scale(ref_activ)
+        #inv_activation = 1 - scaled_activation
         #show(inv_activation)
-        sp = slic_superpixels(scaled_brightness, scaled_band_B, inv_activation, k=30, comp=50, to_mask=to_mask, plot=True)
-        ref_activ = function_over_superpixels(sp, ref_activ, plot=True)
+        #sp = slic_superpixels(scaled_brightness, scaled_band_B, inv_activation, k=30, comp=50, to_mask=to_mask, plot=True)
+        #ref_activ = function_over_superpixels(sp, ref_activ, plot=True)
 
 
 
@@ -176,7 +176,7 @@ for llo in locations: #Leaving out one location at a time
         auc_pr, r_ap99, r_ap95, r_ap90, p_ar99 = AUC_PR(ref_smoothed, ground_truth, flank_mask=flank_mask, exclude_edges=True, bandB=sequence_B[0],
                         plot=True, min_true_pos=min_true_pos)
 
-        if sample_index < 0: #Plot the selected background regions
+        if sample_index < 1000: #Plot the selected background regions
             fig, axs = plt.subplots(nrows=2, ncols=3)
             axs[0,0].imshow(scaled_brightness, cmap="gray")
             axs[1,0].imshow(absorbance, cmap="gray")

@@ -177,6 +177,57 @@ def variance_ratio(bandA, bandB, selected_ref_area, manual_ref_area, flank_mask)
     else:
         return min(selected_sd/gt_sd, 1) #Return the proportion of the standard deviation that is represented (1 if the ref area gives an accurate or an overestimation of the background veriability)
 
+def percentile_ratio(bandA, bandB, selected_ref_area, manual_ref_area, flank_mask):
+    '''Calculate the rough absorbance. For both the selected background values (excluding gt plume mask), and the
+    manually defined values, calculate the range between the 97.5th percentile and 2.5th percentile values.
+    Return the ratio of these values.'''
+
+    #Mask out where bandB = 0
+    inv_flank_mask = np.where(flank_mask == 0, 1, 0)
+    bandB_zero_mask = np.where(bandB == 0, 5, 0)
+    edge_mask = cv2.blur(bandB_zero_mask, (5, 5))
+    edge_mask[:, 0:6] = 1
+    edge_mask[:, -5:] = 1
+    edge_mask[0:6, :] = 1
+    edge_mask[-5:, :] = 1
+    edge_mask = edge_mask + inv_flank_mask
+
+    bandA_copy = copy.deepcopy(bandA)
+    bandA_copy = np.ma.masked_where(edge_mask>0, bandA_copy)
+
+    # Then calculate the absorbance (without accounting for backgrounds)
+    ratio = np.ma.divide(bandA_copy.astype(np.float32), bandB.astype(np.float32))
+    ratio = -1 * np.ma.log(ratio)
+
+    selected_values = np.ma.masked_where(selected_ref_area == 0, ratio)
+    selected_values.mask = np.where(edge_mask > 0, 1, selected_values.mask)
+    selected_values.mask = np.where(manual_ref_area == 0, 1, selected_values.mask)
+    #show(selected_values)
+    selected_values = selected_values.compressed()
+
+    gt_values = np.ma.masked_where(manual_ref_area == 0, ratio)
+    gt_values.mask = np.where(edge_mask > 0, 1, gt_values.mask)
+    #show(gt_values)
+    gt_values = gt_values.compressed()
+
+    if selected_values.shape[0] > 0:
+        p_u_selected = np.percentile(selected_values, 97.5)
+        p_l_selected = np.percentile(selected_values, 2.5)
+        selected_range = p_u_selected - p_l_selected
+    else:
+        selected_range = 0
+    if gt_values.shape[0] > 0:
+        p_u_gt = np.percentile(gt_values, 97.5)
+        p_l_gt = np.percentile(gt_values, 2.5)
+        gt_range = p_u_gt - p_l_gt
+    else:
+        gt_range = 0
+
+    if gt_range == 0: #If the ground truth reference area is constant or doesn't have any area
+        return np.nan
+    else:
+        return selected_range/gt_range #Return the proportion of the 95th percentile range of ground truth values which are represented by the selected pixels
+
 def find_recall_at_precision_level(recalls, precisions, precision_level):
     '''Return the highest recall obtained when precision is greater than
     the given value.'''

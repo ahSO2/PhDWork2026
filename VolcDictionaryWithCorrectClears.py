@@ -82,8 +82,9 @@ Cotopaxi_View4_dictionary = {'volcano_dictionary_name':"CotopaxiView4",
                            "cam_lat": -0.642243,
                            "cam_lon": -78.402786,
                            "volc_lat": -0.683753,
-                           "volc_lon": -78.437091
-                           }
+                           "volc_lon": -78.437091,
+                           "DD_tl":(30,30),
+                           "DD_br":(130, 580)}
 
 Kilauea_View1_dictionary = {'volcano_dictionary_name':"KilaueaView1",
                             'volcano_name':'Kilauea',
@@ -111,7 +112,9 @@ Kilauea_View1_dictionary = {'volcano_dictionary_name':"KilaueaView1",
                            "cam_lat": 19.37915,
                            "cam_lon": -155.28081,
                            "volc_lat": 19.400282,
-                           "volc_lon": -155.294696
+                           "volc_lon": -155.294696,
+                           "DD_tl":(90, 30),
+                           "DD_br":(190, 618)
                            }
 
 
@@ -141,7 +144,9 @@ Kilauea_View2_dictionary = {'volcano_dictionary_name':"KilaueaView2",
                            "cam_lat": 19.37915,
                            "cam_lon": -155.28081,
                            "volc_lat": 19.400282,
-                           "volc_lon": -155.294696
+                           "volc_lon": -155.294696,
+                           "DD_tl":(40,30),
+                           "DD_br":(140, 618)
                            }
 
 Reventador_2023_dictionary = {'volcano_dictionary_name':"Reventador2023",
@@ -170,7 +175,10 @@ Reventador_2023_dictionary = {'volcano_dictionary_name':"Reventador2023",
                               "cam_lat":-0.073421,
                               "cam_lon":-77.617984,
                               "volc_lat":-0.080990,
-                              "volc_lon":-77.658503}
+                              "volc_lon":-77.658503,
+                                "DD_tl":(30,30),
+                                "DD_br":(130, 618)
+                              }
 
 Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               'volcano_name':'Reventador',
@@ -198,7 +206,10 @@ Reventador_2024_dictionary = {'volcano_dictionary_name':"Reventador2024",
                               "cam_lat":-0.09559,
                               "cam_lon":-77.62871,
                               "volc_lat":-0.080990,
-                              "volc_lon":-77.658503}
+                              "volc_lon":-77.658503,
+                                "DD_tl":(30,30),
+                                "DD_br":(130, 618)
+                              }
 
 
 Lascar_View1_dictionary = {'volcano_dictionary_name':"LascarView1",
@@ -226,7 +237,9 @@ Lascar_View1_dictionary = {'volcano_dictionary_name':"LascarView1",
                               "cam_lat":-23.398286,
                               "cam_lon":-67.7203136,
                               "volc_lat":-23.367376,
-                              "volc_lon":-67.733365}
+                              "volc_lon":-67.733365,
+                           "DD_tl":(30, 36),
+                           "DD_br":(130, 618)}
 
 Lascar_NineteenthAug_dictionary = {'volcano_dictionary_name':"LascarNineteenthAugust",
                      'volcano_name':"Lascar",
@@ -305,7 +318,9 @@ Merapi_View0_dictionary = {'volcano_dictionary_name':"MerapiView0",
                            "cam_lat": -7.497253,
                            "cam_lon": -110.421567,
                            "volc_lat": -7.540918,
-                           "volc_lon": -110.445874
+                           "volc_lon": -110.445874,
+                           "DD_tl":(30,30),
+                           "DD_br":(130, 595)
                            }
 
 Merapi_TenthJune_dictionary = {'volcano_dictionary_name':"MerapiTenthJune",
@@ -355,7 +370,9 @@ Merapi_SixteenthJune_dictionary = {'volcano_dictionary_name':"MerapiSixteenthJun
                            "cam_lat": -7.497253,
                            "cam_lon": -110.421567,
                            "volc_lat": -7.540918,
-                           "volc_lon": -110.445874
+                           "volc_lon": -110.445874,
+                           "DD_tl":(30,30),
+                           "DD_br":(130, 618)
                            }
 
 Merapi_SecondOct_dictionary = {'volcano_dictionary_name':"MerapiSecondOct",
@@ -381,7 +398,9 @@ Merapi_SecondOct_dictionary = {'volcano_dictionary_name':"MerapiSecondOct",
                            "cam_lat": -7.497253,
                            "cam_lon": -110.421567,
                            "volc_lat": -7.540918,
-                           "volc_lon": -110.445874
+                           "volc_lon": -110.445874,
+                           "DD_tl":(30,30),
+                           "DD_br":(130, 600)
                            }
 
 Merapi_View1_dictionary = {'volcano_dictionary_name':"MerapiView1",
@@ -407,7 +426,9 @@ Merapi_View1_dictionary = {'volcano_dictionary_name':"MerapiView1",
                            "cam_lat": -7.497253,
                            "cam_lon": -110.421567,
                            "volc_lat": -7.540918,
-                           "volc_lon": -110.445874
+                           "volc_lon": -110.445874,
+                           "DD_tl":(30,30),
+                           "DD_br":(130, 595)
                            }
 
 Merapi_View3_dictionary = {'volcano_dictionary_name':"MerapiView3",
@@ -494,7 +515,9 @@ Merapi_View5_dictionary = {'volcano_dictionary_name':"MerapiView5",
                            "cam_lat": -7.497253,
                            "cam_lon": -110.421567,
                            "volc_lat": -7.540918,
-                           "volc_lon": -110.445874
+                           "volc_lon": -110.445874,
+                           "DD_tl":(30,30),
+                           "DD_br":(130, 605)
                            }
 
 all_dictionaries = [Cotopaxi_View2_dictionary, Cotopaxi_View3_dictionary, Cotopaxi_View4_dictionary, Kilauea_View1_dictionary, Kilauea_View2_dictionary,

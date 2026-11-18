@@ -5,13 +5,14 @@ import numpy as np
 import pyplis
 import scipy
 from skimage.filters.rank import entropy
+from sklearn.metrics import precision_recall_curve
 from skimage.morphology import disk
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 from FastBilateral import *
 from ScalingFunctions import min_max_scale, scale_by_percentile, hist_max_thresh
 from Show import show
-from RefAreaActivationFunctions import relative_brightness_99p, relative_absorbance, mvmt_above_noise, abs_var, abs_diff_var, function_over_grid
+from RefAreaActivationFunctions import relative_brightness_99p, relative_absorbance, mvmt_above_noise, abs_var, abs_diff_var, function_over_grid, ero, opening
 
 def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
     '''A function to allow easy implementation of thresholding on channels
@@ -34,13 +35,15 @@ def thresholding(bandA, bandB, volcano_dictionary, plot=False, next_frame=None):
     return ref_areas
 
 
-def delledonne_max_bandA(bandA, bandB, plot=False):
+def delledonne_max_bandA(bandA, bandB, volc_dict, plot=False):
     '''Select the maximum pixel value in the band A image within a rectangular
     region at the top of the image. Select a small circular region around this
     point from which to take the average band A value. '''
 
-    tl = (30, 30)
-    br = (130, 618)
+    #tl = (30, 30)
+    #br = (130, 618)
+    tl = volc_dict["DD_tl"]
+    br = volc_dict["DD_br"]
     sky_region = bandA[tl[0]:br[0] + 1, tl[1]:br[1]+1].copy()
     circle_radius = 20
 
@@ -73,7 +76,7 @@ def delledonne_max_bandA(bandA, bandB, plot=False):
 
     return circle_mask, "D-A" #Return the selected circle as the reference area
 
-def delledonne_min_ratio(bandA, bandB, plot=False):
+def delledonne_min_ratio(bandA, bandB, volc_dict, plot=False):
     '''Select the minimum of -ln(bandA/bandB) value within a rectangular
         region at the top of the image. Select a small circular region around this
         point from which to take the average ratio value.
@@ -81,8 +84,14 @@ def delledonne_min_ratio(bandA, bandB, plot=False):
         Any overlap of the selected circle with the areas where bandB=0 is removed
         from the selected region.'''
 
-    tl = (30, 30)
-    br = (130, 618)
+    #TODO Note: As standard I have used a rectangle with tl = (30,30), br = (130, 618).
+    #But for each dictionary, if the rectngle is near to the zero-area in bandB (from registration)
+    #then I move the corners so there is about 10pixels leeway on each edge.
+
+    #tl = (30, 30)
+    #br = (130, 618)
+    tl = volc_dict["DD_tl"]
+    br = volc_dict["DD_br"]
     circle_radius = 20
 
     #First mask out the edges which cause artifical high absorbance values
@@ -138,10 +147,10 @@ def delledonne_min_ratio(bandA, bandB, plot=False):
         plt.imshow(img_to_show, cmap="YlGnBu_r", vmin=np.ma.min(ratio), vmax=np.ma.max(ratio))
         plt.colorbar()
         plt.show()
-        plt.imshow(bandA)
-        plt.show()
-        plt.imshow(bandB)
-        plt.show()
+        #plt.imshow(bandA)
+        #plt.show()
+        #plt.imshow(bandB)
+        #plt.show()
     return circle_mask, "D-R"
 
 def osorio_threshold_and_connect(bandA, bandB, volcano_dictionary, plot=False):
@@ -471,7 +480,7 @@ def custom_grid_mean(sequence, sequence_B, flank_mask, edge_mask, to_mask, smoot
 
     return ref_areas, "C_GM"
 
-def custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask):
+def custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_mask, ground_truth):
     scaled_brightness, method_name = relative_brightness_99p(sequence[0])
     absorbance, method_name = relative_absorbance(sequence[0], sequence_B[0], flank_mask)
     movement, method_name = mvmt_above_noise(sequence[0], sequence[1], sequence[2], flank_mask)
@@ -488,12 +497,144 @@ def custom_bilateral_smoothed(sequence, sequence_B, flank_mask, edge_mask, to_ma
 
     ref_img = (scaled_brightness * 100).astype(np.uint8)
     ref_img = np.where(ref_activ.mask, -100, ref_img)
-    smoothed_activ = cross_bilateral_filter_fast(ref_activ, ref_img=ref_img, sigma_s=80, sigma_r=40, sa_s=10, sa_r=5)
+    #smoothed_activ = cross_bilateral_filter_fast(ref_activ, ref_img=ref_img, sigma_s=80, sigma_r=40, sa_s=10, sa_r=5)
+    smoothed_activ = ero(ref_activ, 20, mask_out=False, plot=False)
     #show(smoothed_activ)
     smoothed_activ = np.ma.masked_where(ref_activ.mask, smoothed_activ)
 
+    ig, axs = plt.subplots(ncols=2)
+    axs[0].imshow(smoothed_activ, vmax=0.5, vmin=-1)
+    axs[1].imshow(sequence[0])
+    plt.show()
+
     #thresh = hist_max_thresh(smoothed_activ, plot=True)[0]
     thresh = 0
+    #optimal_thresh = optimal_thresholding(smoothed_activ, ground_truth, flank_mask, sequence_B[0], plot=True)
+    thresh = histogram_peak_thresholding(smoothed_activ, ground_truth, flank_mask, sequence_B[0], plot=True)
     ref_areas = np.where(smoothed_activ > thresh, 1, 0)
     #show(ref_areas)
+
     return ref_areas, "C-CB"
+
+def optimal_thresholding(predictions, ground_truth, flank_mask, bandB, plot=True):
+        '''Calculate the histogram of the acivation values. Draw the optimal threshold which is obtained
+        by thresholding at the 99% precision point on the P-R curve. '''
+
+        #Identify threshold at 99% precision:
+        p = copy.deepcopy(predictions)
+        gt = copy.deepcopy(ground_truth)
+        to_mask = np.where(flank_mask == 1, 0, 1)
+
+        bandB_zero_mask = np.where(bandB == 0, 5, 0)
+        edge_mask = cv2.blur(bandB_zero_mask, (11, 11))
+        edge_mask[:, 0:6] = 1
+        edge_mask[:, -5:] = 1
+        edge_mask[0:6, :] = 1
+        edge_mask[-5:, :] = 1
+        to_mask += edge_mask
+
+        if np.ma.isMaskedArray(p):
+            to_mask += p.mask.astype(np.uint8)
+        if np.ma.isMaskedArray(gt):
+            to_mask += gt.mask.astype(np.uint8)
+
+        p = np.ma.masked_where(to_mask > 0, p)
+        gt = np.ma.masked_where(to_mask > 0, gt)
+        precisions, recalls, thresholds = precision_recall_curve(y_true=gt.compressed(), y_score=p.compressed())
+
+        #Select the threshold that gives the best recall at at least 99% precision
+        thresholds = np.concat([thresholds, np.array([np.max(predictions)])])
+        rel_indexes = [i for i in range(len(recalls)) if precisions[i] > 0.99]
+        rel_recalls = [recalls[ri] for ri in rel_indexes]
+        rel_thresholds = [thresholds[ti] for ti in rel_indexes]
+        max_index = np.argmax(rel_recalls)
+        corr_threshold = rel_thresholds[max_index]
+
+        #Now calculate and plot the histogram:
+        n_bins = 30
+        values = predictions.compressed()
+        counts, bins = np.histogram(values, n_bins, [np.nanmin(values), np.nanmax(values)])
+        bin_length = np.abs(np.nanmax(values) - np.nanmin(values)) / n_bins
+
+        max_bin_index = np.argmax(counts)  # Index of tallest bin (starting from 0)
+        rhs_boundary = bins[max_bin_index + 1]
+        center = rhs_boundary - bin_length / 2
+        lhs_boundary = rhs_boundary - bin_length
+
+        if plot == True:
+            bin_centers = np.linspace(bin_length / 2, bin_length * (n_bins - 1 + 0.5), n_bins)
+            plt.stairs(counts, bins)
+            plt.scatter(bin_centers, np.ones_like(bin_centers))
+            plt.axvline(x=rhs_boundary, c="blue")
+            plt.axvline(x=center, c="blue")
+            plt.axvline(x=lhs_boundary, c="blue")
+            plt.axvline(corr_threshold, c="red")
+            plt.show()
+            show(predictions)
+
+        return corr_threshold
+
+def histogram_peak_thresholding(predictions, ground_truth, flank_mask, bandB, plot=True):
+        '''Calculate the histogram of the acivation values. Draw the optimal threshold which is obtained
+        by thresholding at the 99% precision point on the P-R curve. '''
+
+        #Identify threshold at 99% precision:
+        show(predictions)
+        p = copy.deepcopy(predictions)
+        gt = copy.deepcopy(ground_truth)
+        to_mask = np.where(flank_mask == 1, 0, 1)
+
+        bandB_zero_mask = np.where(bandB == 0, 5, 0)
+        edge_mask = cv2.blur(bandB_zero_mask, (11, 11))
+        edge_mask[:, 0:6] = 1
+        edge_mask[:, -5:] = 1
+        edge_mask[0:6, :] = 1
+        edge_mask[-5:, :] = 1
+        to_mask += edge_mask
+
+        if np.ma.isMaskedArray(p):
+            to_mask += p.mask.astype(np.uint8)
+
+        p = np.ma.masked_where(to_mask > 0, p)
+        gt = np.ma.masked_where(to_mask > 0, gt)
+
+        #Determine the optimal threshold using the ground truth (for reference)
+        precisions, recalls, thresholds = precision_recall_curve(y_true=gt.compressed(), y_score=p.compressed())
+
+        # Select the threshold that gives the best recall at at least 99% precision
+        thresholds = np.concat([thresholds, np.array([np.max(predictions)])])
+        rel_indexes = [i for i in range(len(recalls)) if precisions[i] > 0.99]
+        rel_recalls = [recalls[ri] for ri in rel_indexes]
+        rel_thresholds = [thresholds[ti] for ti in rel_indexes]
+        max_index = np.argmax(rel_recalls)
+        corr_threshold = rel_thresholds[max_index]
+
+        #Now calculate and plot the histogram:
+        n_bins = 30
+        values = predictions.compressed()
+        counts, bins = np.histogram(values, n_bins, [np.nanmin(values), np.nanmax(values)])
+        bin_length = np.abs(np.nanmax(values) - np.nanmin(values)) / n_bins
+
+        peaks, properties = scipy.signal.find_peaks(counts, height=1000, width=bin_length/2)
+
+        #max_bin_index = np.argmax(counts)  # Index of tallest bin (starting from 0)
+        #rhs_boundary = bins[max_bin_index + 1]
+        #center = rhs_boundary - bin_length / 2
+        #lhs_boundary = rhs_boundary - bin_length
+
+        if plot == True:
+            bin_centers = np.linspace(bins[0] + bin_length / 2, bins[0] + bin_length * (n_bins - 1 + 0.5), n_bins)
+            plt.stairs(counts, bins)
+            plt.scatter(bin_centers, np.ones_like(bin_centers))
+            for peak in peaks:
+                plt.axvline(bin_centers[peak])
+            if len(peaks) > 0:
+                rhs_peak_index = peaks[-1] #Index of the bin corr to the rhs peak
+                peak_lhs = properties["left_ips"][-1] * bin_length + bins[0]
+                plt.axvline(bin_centers[rhs_peak_index], c="orange")
+                plt.axvline(peak_lhs, c="orange")
+
+            plt.axvline(corr_threshold, c="red")
+            plt.show()
+
+        return 0
